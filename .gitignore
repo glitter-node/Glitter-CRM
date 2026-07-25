@@ -1,0 +1,11 @@
+# IDE
+.vscode/
+.idea/
+
+# Test
+coverage/
+.phpunit.cache/
+
+# OS
+.DS_Store
+Thumbs.db

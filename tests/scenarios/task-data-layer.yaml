@@ -1,0 +1,15 @@
+name: task-data-layer
+description: CRM Task schema, UUID 관계, 상태 불변식과 Contact next_task_at 집계를 검증한다.
+steps:
+  - create_task_for_contact_by_public_uuid
+  - assign_or_unassign_user_by_public_uuid
+  - normalize_title_description_due_at_and_metadata
+  - apply_pending_and_normal_defaults
+  - maintain_completed_at_from_status_transitions
+  - search_filter_sort_and_paginate_tasks
+  - filter_overdue_active_tasks
+  - preserve_contact_and_public_uuid_on_update
+  - soft_delete_task_without_restore_or_force_delete
+  - recalculate_contact_next_task_at_in_transaction
+  - verify_foreign_keys_indexes_and_reverse_rollback
+  - verify_no_task_http_ui_notification_or_observer_surface

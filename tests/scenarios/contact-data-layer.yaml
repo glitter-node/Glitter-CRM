@@ -1,0 +1,33 @@
+# audit:allow test-scenario-coverage reason: |
+#   Phase 2-A는 HTTP 표면 없이 Contact 데이터 계층의 불변 조건만 추가한다.
+#   상태/회원 연결/중복값/검색/삭제 축은 아래 두 테스트 파일에서 직접 검증한다.
+feature: glitter-crm Contact 데이터 기반
+
+description: |
+  회원 여부와 무관한 CRM Contact를 UUID로 식별하고, 상태·검색·페이지네이션과
+  soft delete를 Repository 및 Service 계층을 통해 처리한다.
+
+axes:
+  membership: [guest, linked_user, unassigned]
+  status: [active, inactive, archived]
+  persistence: [create, read, update, soft_delete]
+
+effects:
+  - crm_contacts_uses_internal_bigint_and_public_uuid
+  - user_and_assigned_user_are_nullable_and_null_on_delete
+  - duplicate_email_phone_and_mobile_are_allowed
+  - contact_status_is_cast_to_backed_enum
+  - metadata_is_cast_to_array
+  - repository_filters_searches_sorts_and_paginates
+  - service_normalizes_minimum_domain_input
+  - soft_deleted_contacts_are_excluded_by_default
+  - contact_http_layer_uses_the_existing_service_and_repository_contract
+  - no_future_domain_models_are_added
+
+test_files:
+  - modules/_bundled/glitter-crm/tests/Unit/ContactStructureTest.php
+  - modules/_bundled/glitter-crm/tests/Feature/ContactDataLayerTest.php
+
+notes: |
+  linked_user의 물리 FK와 nullOnDelete는 migration 검증 대상이다. 실제 DB 테스트는
+  격리된 .env.testing이 준비된 환경에서만 실행한다.

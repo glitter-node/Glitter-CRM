@@ -1,0 +1,40 @@
+# audit:allow test-scenario-coverage reason: |
+#   Contact 관리자 API의 인증·권한·validation·CRUD·soft-delete 효과는
+#   ContactApiTest와 ContactHttpStructureTest가 endpoint 단위로 검증한다.
+feature: glitter-crm Contact 관리자 API
+
+description: |
+  관리자 인증과 기능별 권한을 거쳐 Contact를 생성하고, 목록·UUID 상세·수정·
+  soft delete하며 내부 bigint 식별자를 공개하지 않는다.
+
+axes:
+  authentication: [unauthenticated, admin]
+  permission: [read, create, update, delete, missing]
+  operation: [index, store, show, update, destroy]
+  contact_state: [active, inactive, archived, soft_deleted]
+
+effects:
+  - module_route_prefix_and_name_are_applied_once
+  - admin_authentication_is_required
+  - endpoint_permission_is_enforced
+  - contact_is_created_with_public_uuid
+  - internal_id_and_deleted_at_are_not_exposed
+  - list_is_filtered_sorted_and_paginated
+  - linked_users_use_public_uuid
+  - contact_is_retrieved_and_updated_by_uuid
+  - invalid_filters_and_payloads_return_422
+  - delete_sets_deleted_at_without_force_delete
+  - deleted_contact_returns_404
+  - contact_tags_are_synced_by_public_uuid
+  - omitted_tag_field_preserves_existing_relationship
+  - null_or_empty_tag_array_clears_relationship
+  - unavailable_tag_rolls_back_contact_write
+  - no_future_domain_api_is_added
+
+test_files:
+  - modules/_bundled/glitter-crm/tests/Feature/ContactApiTest.php
+  - modules/_bundled/glitter-crm/tests/Unit/ContactHttpStructureTest.php
+
+notes: |
+  실제 HTTP/DB 실행은 격리된 .env.testing에서 수행한다. production에서는 route
+  소스·PHP 문법·YAML schema만 검증한다.

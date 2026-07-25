@@ -1,0 +1,9 @@
+name: tag-data-layer
+description: CRM Tag 데이터와 Contact 연결 기반을 검증한다.
+steps:
+  - create_tag_with_uuid_and_multilingual_slug
+  - reject_duplicate_slug
+  - search_update_and_soft_delete_tag
+  - attach_and_detach_tag_with_public_uuids
+  - sync_contact_tags_and_remove_duplicates
+  - preserve_pivot_on_soft_delete_and_cascade_on_physical_delete

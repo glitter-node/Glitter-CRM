@@ -1,0 +1,1201 @@
+{
+  "version": "1.3.3",
+  "layout_name": "admin_crm_contact_form",
+  "permissions": ["glitter-crm.contacts.read"],
+  "extends": "_admin_base",
+  "meta": {
+    "title": "{{route?.id ? '$t:glitter-crm.admin.contacts.edit_title' : '$t:glitter-crm.admin.contacts.create_title'}}",
+    "description": "{{route?.id ? '$t:glitter-crm.admin.contacts.edit_description' : '$t:glitter-crm.admin.contacts.create_description'}}"
+  },
+  "computed": {
+    "isReadOnly": "{{!!route?.id && contact?.data?.abilities?.can_update !== true}}"
+  },
+  "transition_overlay": {"wait_for": ["contact"]},
+  "data_sources": [
+    {
+      "id": "contact",
+      "type": "api",
+      "endpoint": "/api/modules/glitter-crm/admin/contacts/{{route?.id}}",
+      "method": "GET",
+      "auto_fetch": true,
+      "auth_required": true,
+      "if": "{{route?.id}}",
+      "initLocal": "form",
+      "refetchOnMount": true,
+      "onSuccess": [
+        {
+          "handler": "setState",
+          "params": {
+            "target": "local",
+            "form.tag_uuids": "{{(response.data?.data?.tags ?? []).map(tag => tag.uuid)}}"
+          }
+        }
+      ],
+      "errorHandling": {
+        "403": {"handler": "showErrorPage", "params": {"target": "content"}},
+        "404": {"handler": "showErrorPage", "params": {"target": "content"}},
+        "default": {"handler": "toast", "params": {"type": "error", "message": "$t:glitter-crm.admin.contacts.load_failed"}}
+      },
+      "fallback": {"data": null}
+    },
+    {
+      "id": "tag_options",
+      "type": "api",
+      "endpoint": "/api/modules/glitter-crm/admin/tags",
+      "method": "GET",
+      "auto_fetch": true,
+      "auth_required": true,
+      "params": {"sort": "name", "direction": "asc", "per_page": 100, "page": 1},
+      "errorHandling": {
+        "403": {"handler": "setState", "params": {"target": "local", "tagOptions": []}},
+        "default": {"handler": "setState", "params": {"target": "local", "tagOptions": []}}
+      },
+      "fallback": {"success": false, "data": {"data": []}}
+    },
+    {
+      "id": "tasks",
+      "type": "api",
+      "endpoint": "/api/modules/glitter-crm/admin/contacts/{{route?.id}}/tasks",
+      "method": "GET",
+      "auto_fetch": true,
+      "auth_required": true,
+      "if": "{{!!route?.id}}",
+      "refetchOnMount": true,
+      "params": {
+        "search": "{{_local.taskFilters?.search || null}}",
+        "status": "{{_local.taskFilters?.status || null}}",
+        "priority": "{{_local.taskFilters?.priority || null}}",
+        "assigned_to_uuid": "{{_local.taskFilters?.assigned_to_uuid || null}}",
+        "due_from": "{{_local.taskFilters?.due_from ? new Date(_local.taskFilters.due_from).toISOString() : null}}",
+        "due_to": "{{_local.taskFilters?.due_to ? new Date(_local.taskFilters.due_to).toISOString() : null}}",
+        "overdue": "{{_local.taskFilters?.overdue === true ? true : null}}",
+        "per_page": 20,
+        "page": "{{_local.taskPage || 1}}"
+      },
+      "onSuccess": [
+        {"handler": "setState", "params": {"target": "local", "taskReadable": true, "taskLoadFailed": false}}
+      ],
+      "errorHandling": {
+        "403": {"handler": "setState", "params": {"target": "local", "taskReadable": false, "taskLoadFailed": false}},
+        "default": {"handler": "setState", "params": {"target": "local", "taskLoadFailed": true}}
+      },
+      "fallback": {"success": false, "data": {"data": [], "meta": {"current_page": 1, "last_page": 1, "per_page": 20, "total": 0}, "abilities": {"can_create": false}}}
+    },
+    {
+      "id": "activities",
+      "type": "api",
+      "endpoint": "/api/modules/glitter-crm/admin/contacts/{{route?.id}}/activities",
+      "method": "GET",
+      "auto_fetch": true,
+      "auth_required": true,
+      "if": "{{!!route?.id}}",
+      "refetchOnMount": true,
+      "params": {
+        "search": "{{_local.activityFilters?.search || null}}",
+        "type": "{{_local.activityFilters?.type || null}}",
+        "occurred_from": "{{_local.activityFilters?.occurred_from ? new Date(_local.activityFilters.occurred_from).toISOString() : null}}",
+        "occurred_to": "{{_local.activityFilters?.occurred_to ? new Date(_local.activityFilters.occurred_to).toISOString() : null}}",
+        "sort": "occurred_at",
+        "direction": "desc",
+        "per_page": 20,
+        "page": "{{_local.activityPage || 1}}"
+      },
+      "onSuccess": [
+        {"handler": "setState", "params": {"target": "local", "activityReadable": true, "activityLoadFailed": false}}
+      ],
+      "errorHandling": {
+        "403": {"handler": "setState", "params": {"target": "local", "activityReadable": false, "activityLoadFailed": false}},
+        "default": {"handler": "setState", "params": {"target": "local", "activityLoadFailed": true}}
+      },
+      "fallback": {"success": false, "data": {"data": [], "meta": {"current_page": 1, "last_page": 1, "per_page": 20, "total": 0}, "abilities": {"can_create": false}}}
+    }
+  ],
+  "init_actions": [
+    {
+      "handler": "setState",
+      "params": {
+        "target": "local",
+        "taskFilters": {"search": "", "status": "", "priority": "", "assigned_to_uuid": null, "due_from": null, "due_to": null, "overdue": false},
+        "taskPage": 1,
+        "taskReadable": null,
+        "taskLoadFailed": false,
+        "taskFormMode": "create",
+        "taskForm": {"title": "", "description": null, "status": "pending", "priority": "normal", "assigned_to_uuid": null, "due_at": null, "assignee": null},
+        "taskFormErrors": null,
+        "taskSaving": false,
+        "taskDeleting": false,
+        "selectedTaskUuid": null,
+        "taskDeleteTarget": null,
+        "activityFilters": {"search": "", "type": "", "occurred_from": null, "occurred_to": null},
+        "activityPage": 1,
+        "activityReadable": null,
+        "activityLoadFailed": false,
+        "activityFormMode": "create",
+        "activityForm": {"type": "note", "subject": null, "body": null, "occurred_at": null},
+        "activityFormErrors": null,
+        "activitySaving": false,
+        "activityDeleting": false,
+        "selectedActivityUuid": null,
+        "activityDeleteTarget": null
+      }
+    },
+    {
+      "if": "{{!route?.id}}",
+      "handler": "setState",
+      "params": {
+        "target": "local",
+        "form": {
+          "name": "",
+          "status": "active",
+          "company": null,
+          "job_title": null,
+          "email": null,
+          "phone": null,
+          "mobile": null,
+          "user_id": null,
+          "assigned_user_id": null,
+          "locale": null,
+          "timezone": null,
+          "source": null,
+          "next_action_at": null,
+          "tag_uuids": [],
+          "tags": []
+        },
+        "errors": null,
+        "saving": false,
+        "deleting": false,
+        "linkedUserOptions": [],
+        "assigneeOptions": [],
+        "tagOptions": []
+      }
+    }
+  ],
+  "slots": {
+    "content": [
+      {
+        "id": "contact_form_content",
+        "type": "basic",
+        "name": "Div",
+        "blur_until_loaded": true,
+        "dataKey": "form",
+        "props": {"className": "admin-page-content-responsive-fluid"},
+        "children": [
+          {
+            "id": "contact_form_header",
+            "type": "composite",
+            "name": "PageHeader",
+            "props": {
+              "title": "{{route?.id ? '$t:glitter-crm.admin.contacts.edit_title' : '$t:glitter-crm.admin.contacts.create_title'}}",
+              "description": "{{route?.id ? '$t:glitter-crm.admin.contacts.edit_description' : '$t:glitter-crm.admin.contacts.create_description'}}"
+            },
+            "children": [
+              {
+                "type": "basic",
+                "name": "Button",
+                "props": {"className": "btn btn-neutral"},
+                "actions": [{"type": "click", "handler": "navigate", "params": {"path": "/admin/crm/contacts"}}],
+                "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.back"}]
+              }
+            ]
+          },
+          {
+            "id": "contact_form_errors",
+            "type": "basic",
+            "name": "Div",
+            "if": "{{_local.errors && Object.keys(_local.errors).length > 0}}",
+            "props": {"className": "alert-danger mb-6"},
+            "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.save_failed"}]
+          },
+          {
+            "id": "contact_form",
+            "type": "basic",
+            "name": "Div",
+            "props": {"className": "admin-card"},
+            "children": [
+              {
+                "type": "basic",
+                "name": "Div",
+                "props": {"className": "grid grid-cols-1 md:grid-cols-2 gap-5"},
+                "children": [
+                  {
+                    "id": "name_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.name"},
+                      {
+                        "type": "basic",
+                        "name": "Input",
+                        "props": {"type": "text", "value": "{{_local.form?.name ?? ''}}", "disabled": "{{_computed.isReadOnly}}", "className": "input w-full"},
+                        "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.name": "{{$event.target.value}}"}}]
+                      },
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.name}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.name?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "status_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.status"},
+                      {
+                        "type": "composite",
+                        "name": "Select",
+                        "props": {
+                          "value": "{{_local.form?.status ?? 'active'}}",
+                          "disabled": "{{_computed.isReadOnly}}",
+                          "className": "w-full",
+                          "options": [
+                            {"label": "$t:glitter-crm.admin.contacts.status.active", "value": "active"},
+                            {"label": "$t:glitter-crm.admin.contacts.status.inactive", "value": "inactive"},
+                            {"label": "$t:glitter-crm.admin.contacts.status.archived", "value": "archived"}
+                          ]
+                        },
+                        "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.status": "{{$event.target.value}}"}}]
+                      },
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.status}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.status?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "company_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.company"},
+                      {"type": "basic", "name": "Input", "props": {"type": "text", "value": "{{_local.form?.company ?? ''}}", "disabled": "{{_computed.isReadOnly}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.company": "{{$event.target.value || null}}"}}]},
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.company}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.company?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "job_title_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.job_title"},
+                      {"type": "basic", "name": "Input", "props": {"type": "text", "value": "{{_local.form?.job_title ?? ''}}", "disabled": "{{_computed.isReadOnly}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.job_title": "{{$event.target.value || null}}"}}]},
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.job_title}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.job_title?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "email_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.email"},
+                      {"type": "basic", "name": "Input", "props": {"type": "email", "value": "{{_local.form?.email ?? ''}}", "disabled": "{{_computed.isReadOnly}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.email": "{{$event.target.value || null}}"}}]},
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.email}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.email?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "phone_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.phone"},
+                      {"type": "basic", "name": "Input", "props": {"type": "tel", "value": "{{_local.form?.phone ?? ''}}", "disabled": "{{_computed.isReadOnly}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.phone": "{{$event.target.value || null}}"}}]},
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.phone}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.phone?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "mobile_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.mobile"},
+                      {"type": "basic", "name": "Input", "props": {"type": "tel", "value": "{{_local.form?.mobile ?? ''}}", "disabled": "{{_computed.isReadOnly}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.mobile": "{{$event.target.value || null}}"}}]},
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.mobile}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.mobile?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "linked_user_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.linked_user"},
+                      {
+                        "type": "composite",
+                        "name": "SearchableDropdown",
+                        "props": {
+                          "options": "{{_local.linkedUserOptions?.length ? _local.linkedUserOptions : (_local.form?.user ? [{value:_local.form.user.uuid,label:_local.form.user.name}] : [])}}",
+                          "value": "{{_local.form?.user_id || ''}}",
+                          "triggerLabel": "$t:glitter-crm.admin.contacts.fields.linked_user",
+                          "searchPlaceholder": "$t:glitter-crm.admin.contacts.linked_user_search",
+                          "noResultsText": "$t:glitter-crm.admin.contacts.no_results",
+                          "initialText": "$t:glitter-crm.admin.contacts.search_initial",
+                          "disabled": "{{_computed.isReadOnly}}",
+                          "className": "w-full"
+                        },
+                        "actions": [
+                          {
+                            "event": "onSearch",
+                            "handler": "apiCall",
+                            "debounce": 300,
+                            "auth_required": true,
+                            "target": "/api/admin/users/search",
+                            "params": {"method": "GET", "query": {"keyword": "{{$args[0]}}"}},
+                            "onSuccess": [{"handler": "setState", "params": {"target": "local", "linkedUserOptions": "{{(response.data ?? []).map(u => ({value:u.uuid,label:u.name,description:u.email}))}}"}}],
+                            "onError": [{"handler": "setState", "params": {"target": "local", "linkedUserOptions": []}}]
+                          },
+                          {"event": "onChange", "type": "change", "handler": "setState", "params": {"target": "local", "form.user_id": "{{$args[0] || null}}"}}
+                        ]
+                      },
+                      {
+                        "type": "basic",
+                        "name": "Button",
+                        "if": "{{!!_local.form?.user_id && !_computed.isReadOnly}}",
+                        "props": {"className": "btn btn-sm btn-neutral mt-2"},
+                        "actions": [{"type": "click", "handler": "setState", "params": {"target": "local", "form.user_id": null, "linkedUserOptions": []}}],
+                        "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.clear_selection"}]
+                      },
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.user_id}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.user_id?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "assignee_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.assignee"},
+                      {
+                        "type": "composite",
+                        "name": "SearchableDropdown",
+                        "props": {
+                          "options": "{{_local.assigneeOptions?.length ? _local.assigneeOptions : (_local.form?.assigned_user ? [{value:_local.form.assigned_user.uuid,label:_local.form.assigned_user.name}] : [])}}",
+                          "value": "{{_local.form?.assigned_user_id || ''}}",
+                          "triggerLabel": "$t:glitter-crm.admin.contacts.fields.assignee",
+                          "searchPlaceholder": "$t:glitter-crm.admin.contacts.assignee_search",
+                          "noResultsText": "$t:glitter-crm.admin.contacts.no_results",
+                          "initialText": "$t:glitter-crm.admin.contacts.search_initial",
+                          "disabled": "{{_computed.isReadOnly}}",
+                          "className": "w-full"
+                        },
+                        "actions": [
+                          {
+                            "event": "onSearch",
+                            "handler": "apiCall",
+                            "debounce": 300,
+                            "auth_required": true,
+                            "target": "/api/admin/users/search",
+                            "params": {"method": "GET", "query": {"keyword": "{{$args[0]}}"}},
+                            "onSuccess": [{"handler": "setState", "params": {"target": "local", "assigneeOptions": "{{(response.data ?? []).map(u => ({value:u.uuid,label:u.name,description:u.email}))}}"}}],
+                            "onError": [{"handler": "setState", "params": {"target": "local", "assigneeOptions": []}}]
+                          },
+                          {"event": "onChange", "type": "change", "handler": "setState", "params": {"target": "local", "form.assigned_user_id": "{{$args[0] || null}}"}}
+                        ]
+                      },
+                      {
+                        "type": "basic",
+                        "name": "Button",
+                        "if": "{{!!_local.form?.assigned_user_id && !_computed.isReadOnly}}",
+                        "props": {"className": "btn btn-sm btn-neutral mt-2"},
+                        "actions": [{"type": "click", "handler": "setState", "params": {"target": "local", "form.assigned_user_id": null, "assigneeOptions": []}}],
+                        "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.clear_selection"}]
+                      },
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.assigned_user_id}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.assigned_user_id?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "locale_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.locale"},
+                      {"type": "basic", "name": "Input", "props": {"type": "text", "value": "{{_local.form?.locale ?? ''}}", "disabled": "{{_computed.isReadOnly}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.locale": "{{$event.target.value || null}}"}}]},
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.locale}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.locale?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "timezone_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.timezone"},
+                      {"type": "basic", "name": "Input", "props": {"type": "text", "value": "{{_local.form?.timezone ?? ''}}", "disabled": "{{_computed.isReadOnly}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.timezone": "{{$event.target.value || null}}"}}]},
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.timezone}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.timezone?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "source_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.source"},
+                      {"type": "basic", "name": "Input", "props": {"type": "text", "value": "{{_local.form?.source ?? ''}}", "disabled": "{{_computed.isReadOnly}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.source": "{{$event.target.value || null}}"}}]},
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.source}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.source?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "next_action_at_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.next_action_at"},
+                      {"type": "basic", "name": "Input", "props": {"type": "datetime-local", "value": "{{_local.form?.next_action_at || ''}}", "disabled": "{{_computed.isReadOnly}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "form.next_action_at": "{{$event.target.value || null}}"}}]},
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.next_action_at}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.next_action_at?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "tags_field",
+                    "type": "basic",
+                    "name": "Div",
+                    "if": "{{tag_options?.success === true}}",
+                    "props": {"className": "md:col-span-2"},
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.tags"},
+                      {
+                        "type": "composite",
+                        "name": "SearchableDropdown",
+                        "props": {
+                          "multiple": true,
+                          "options": "{{[...(_local.form?.tags ?? []).map(tag => ({value:tag.uuid,label:tag.name,description:tag.slug})), ...((_local.tagOptions?.length ? _local.tagOptions : (tag_options?.data?.data ?? []).map(tag => ({value:tag.uuid,label:tag.name,description:tag.slug}))).filter(option => !(_local.form?.tags ?? []).some(tag => tag.uuid === option.value)))]}}",
+                          "value": "{{_local.form?.tag_uuids ?? []}}",
+                          "triggerLabel": "$t:glitter-crm.admin.contacts.tag_selector_placeholder",
+                          "searchPlaceholder": "$t:glitter-crm.admin.contacts.tag_search_placeholder",
+                          "noResultsText": "$t:glitter-crm.admin.contacts.no_results",
+                          "initialText": "$t:glitter-crm.admin.contacts.search_initial",
+                          "disabled": "{{_computed.isReadOnly}}",
+                          "className": "w-full"
+                        },
+                        "actions": [
+                          {
+                            "event": "onSearch",
+                            "handler": "apiCall",
+                            "debounce": 300,
+                            "auth_required": true,
+                            "target": "/api/modules/glitter-crm/admin/tags",
+                            "params": {"method": "GET", "query": {"search": "{{$args[0]}}", "sort": "name", "direction": "asc", "per_page": 100}},
+                            "onSuccess": [
+                              {"handler": "setState", "params": {"target": "local", "tagOptions": "{{(response.data?.data?.data ?? []).map(tag => ({value:tag.uuid,label:tag.name,description:tag.slug}))}}"}}
+                            ],
+                            "onError": [
+                              {"handler": "setState", "params": {"target": "local", "tagOptions": []}}
+                            ]
+                          },
+                          {
+                            "event": "onChange",
+                            "handler": "setState",
+                            "params": {"target": "local", "form.tag_uuids": "{{$args[0] ?? []}}"}
+                          }
+                        ]
+                      },
+                      {"type": "basic", "name": "Span", "if": "{{_local.errors?.tag_uuids}}", "props": {"className": "form-error"}, "text": "{{_local.errors?.tag_uuids?.[0]}}"}
+                    ]
+                  },
+                  {
+                    "id": "last_activity_at_display",
+                    "type": "basic",
+                    "name": "Div",
+                    "if": "{{!!route?.id}}",
+                    "children": [
+                      {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.contacts.fields.last_activity_at"},
+                      {"type": "basic", "name": "Span", "props": {"className": "text-body"}, "text": "{{_local.form?.last_activity_at || '$t:glitter-crm.admin.contacts.no_value'}}"}
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "basic",
+                "name": "Div",
+                "props": {"className": "flex justify-between gap-3 mt-6"},
+                "children": [
+                  {
+                    "id": "delete_contact",
+                    "type": "basic",
+                    "name": "Button",
+                    "if": "{{!!route?.id && contact?.data?.abilities?.can_delete === true}}",
+                    "props": {"className": "btn btn-danger", "disabled": "{{_local.deleting === true || _local.saving === true}}"},
+                    "actions": [{"type": "click", "handler": "openModal", "target": "delete_contact_modal"}],
+                    "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.delete"}]
+                  },
+                  {
+                    "type": "basic",
+                    "name": "Div",
+                    "props": {"className": "flex gap-2"},
+                    "children": [
+                      {
+                        "type": "basic",
+                        "name": "Button",
+                        "props": {"className": "btn btn-neutral", "disabled": "{{_local.saving === true}}"},
+                        "actions": [{"type": "click", "handler": "navigate", "params": {"path": "/admin/crm/contacts"}}],
+                        "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.cancel"}]
+                      },
+                      {
+                        "id": "save_contact",
+                        "type": "basic",
+                        "name": "Button",
+                        "if": "{{!route?.id || contact?.data?.abilities?.can_update === true}}",
+                        "props": {"className": "btn btn-primary", "disabled": "{{_local.saving === true}}"},
+                        "actions": [
+                          {
+                            "type": "click",
+                            "handler": "sequence",
+                            "actions": [
+                              {"handler": "setState", "params": {"target": "local", "saving": true, "errors": null}},
+                              {
+                                "handler": "apiCall",
+                                "auth_required": true,
+                                "target": "{{route?.id ? '/api/modules/glitter-crm/admin/contacts/' + route.id : '/api/modules/glitter-crm/admin/contacts'}}",
+                                "params": {
+                                  "method": "{{route?.id ? 'PUT' : 'POST'}}",
+                                  "body": "{{({name:_local.form?.name,status:_local.form?.status || 'active',company:_local.form?.company || null,job_title:_local.form?.job_title || null,email:_local.form?.email || null,phone:_local.form?.phone || null,mobile:_local.form?.mobile || null,user_id:_local.form?.user_id || null,assigned_user_id:_local.form?.assigned_user_id || null,locale:_local.form?.locale || null,timezone:_local.form?.timezone || null,source:_local.form?.source || null,next_action_at:_local.form?.next_action_at || null,...(tag_options?.success === true ? {tag_uuids:_local.form?.tag_uuids ?? []} : {})})}}"
+                                },
+                                "onSuccess": [
+                                  {"handler": "setState", "params": {"target": "local", "saving": false}},
+                                  {"handler": "toast", "params": {"type": "success", "message": "{{route?.id ? '$t:glitter-crm.admin.contacts.updated' : '$t:glitter-crm.admin.contacts.created'}}"}},
+                                  {"handler": "navigate", "params": {"path": "/admin/crm/contacts"}}
+                                ],
+                                "onError": [
+                                  {"handler": "setState", "params": {"target": "local", "saving": false, "errors": "{{error.errors ?? {}}}"}},
+                                  {"handler": "toast", "params": {"type": "error", "message": "$t:glitter-crm.admin.contacts.save_failed"}}
+                                ]
+                              }
+                            ]
+                          }
+                        ],
+                        "children": [{"type": "basic", "name": "Span", "text": "{{_local.saving ? '$t:glitter-crm.admin.contacts.saving' : '$t:glitter-crm.admin.contacts.save'}}"}]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "contact_task_section",
+            "type": "basic",
+            "name": "Div",
+            "if": "{{!!route?.id && _local.taskReadable !== false}}",
+            "props": {"className": "admin-card mt-6"},
+            "children": [
+              {
+                "type": "basic",
+                "name": "Div",
+                "props": {"className": "flex justify-between items-start gap-4 mb-5"},
+                "children": [
+                  {"type": "basic", "name": "Div", "children": [
+                    {"type": "basic", "name": "Span", "props": {"className": "card-title"}, "text": "$t:glitter-crm.admin.tasks.title"},
+                    {"type": "basic", "name": "P", "props": {"className": "text-secondary mt-1"}, "text": "$t:glitter-crm.admin.tasks.description"}
+                  ]},
+                  {
+                    "type": "basic",
+                    "name": "Button",
+                    "if": "{{tasks?.data?.abilities?.can_create === true}}",
+                    "props": {"className": "btn btn-primary"},
+                    "actions": [{"type": "click", "handler": "sequence", "actions": [
+                      {"handler": "setState", "params": {"target": "local", "taskFormMode": "create", "selectedTaskUuid": null, "taskFormErrors": null, "taskForm": {"title": "", "description": null, "status": "pending", "priority": "normal", "assigned_to_uuid": null, "due_at": null, "assignee": null}}},
+                      {"handler": "openModal", "target": "task_form_modal"}
+                    ]}],
+                    "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tasks.create"}]
+                  }
+                ]
+              },
+              {
+                "type": "basic",
+                "name": "Div",
+                "props": {"className": "grid grid-cols-1 md:grid-cols-3 gap-3 mb-4"},
+                "children": [
+                  {"type": "basic", "name": "Input", "props": {"type": "search", "maxLength": 100, "value": "{{_local.taskFilters?.search || ''}}", "placeholder": "$t:glitter-crm.admin.tasks.search_placeholder", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskFilters.search": "{{$event.target.value}}"}}]},
+                  {"type": "composite", "name": "Select", "props": {"value": "{{_local.taskFilters?.status || ''}}", "options": [
+                    {"value": "", "label": "$t:glitter-crm.admin.tasks.status.all"},
+                    {"value": "pending", "label": "$t:glitter-crm.admin.tasks.status.pending"},
+                    {"value": "in_progress", "label": "$t:glitter-crm.admin.tasks.status.in_progress"},
+                    {"value": "completed", "label": "$t:glitter-crm.admin.tasks.status.completed"},
+                    {"value": "cancelled", "label": "$t:glitter-crm.admin.tasks.status.cancelled"}
+                  ]}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskFilters.status": "{{$event.target.value}}"}}]},
+                  {"type": "composite", "name": "Select", "props": {"value": "{{_local.taskFilters?.priority || ''}}", "options": [
+                    {"value": "", "label": "$t:glitter-crm.admin.tasks.priority.all"},
+                    {"value": "low", "label": "$t:glitter-crm.admin.tasks.priority.low"},
+                    {"value": "normal", "label": "$t:glitter-crm.admin.tasks.priority.normal"},
+                    {"value": "high", "label": "$t:glitter-crm.admin.tasks.priority.high"},
+                    {"value": "urgent", "label": "$t:glitter-crm.admin.tasks.priority.urgent"}
+                  ]}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskFilters.priority": "{{$event.target.value}}"}}]},
+                  {"type": "composite", "name": "SearchableDropdown", "props": {
+                    "value": "{{_local.taskFilters?.assigned_to_uuid}}",
+                    "options": "{{_local.taskFilterAssigneeOptions ?? []}}",
+                    "placeholder": "$t:glitter-crm.admin.tasks.filter_assignee",
+                    "searchPlaceholder": "$t:glitter-crm.admin.tasks.filter_assignee_search",
+                    "searchUrl": "/api/admin/users/search",
+                    "searchParam": "search",
+                    "minSearchLength": 1,
+                    "responseMapping": "{{(response.data ?? []).map(user => ({value:user.uuid,label:user.name,description:user.email}))}}",
+                    "noResultsText": "$t:glitter-crm.admin.tasks.no_results",
+                    "initialText": "$t:glitter-crm.admin.tasks.search_initial",
+                    "clearable": true
+                  }, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskFilters.assigned_to_uuid": "{{$event.target.value || null}}"}}]},
+                  {"type": "basic", "name": "Input", "props": {"type": "datetime-local", "value": "{{_local.taskFilters?.due_from || ''}}", "className": "input w-full", "aria-label": "$t:glitter-crm.admin.tasks.due_from"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskFilters.due_from": "{{$event.target.value || null}}"}}]},
+                  {"type": "basic", "name": "Input", "props": {"type": "datetime-local", "value": "{{_local.taskFilters?.due_to || ''}}", "className": "input w-full", "aria-label": "$t:glitter-crm.admin.tasks.due_to"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskFilters.due_to": "{{$event.target.value || null}}"}}]},
+                  {"type": "composite", "name": "Select", "props": {"value": "{{_local.taskFilters?.overdue === true ? 'true' : ''}}", "options": [
+                    {"value": "", "label": "$t:glitter-crm.admin.tasks.overdue_all"},
+                    {"value": "true", "label": "$t:glitter-crm.admin.tasks.overdue_only"}
+                  ]}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskFilters.overdue": "{{$event.target.value === 'true'}}"}}]}
+                ]
+              },
+              {"type": "basic", "name": "Span", "if": "{{_local.taskFilters?.due_from && _local.taskFilters?.due_to && new Date(_local.taskFilters.due_to) < new Date(_local.taskFilters.due_from)}}", "props": {"className": "form-error"}, "text": "$t:glitter-crm.admin.tasks.invalid_date_range"},
+              {"type": "basic", "name": "Div", "props": {"className": "flex gap-2 mb-4"}, "children": [
+                {"type": "basic", "name": "Button", "props": {"className": "btn btn-primary", "disabled": "{{_local.taskFilters?.due_from && _local.taskFilters?.due_to && new Date(_local.taskFilters.due_to) < new Date(_local.taskFilters.due_from)}}"}, "actions": [{"type": "click", "handler": "sequence", "actions": [{"handler": "setState", "params": {"target": "local", "taskPage": 1}}, {"handler": "refetchDataSource", "params": {"dataSourceId": "tasks"}}]}], "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tasks.search"}]},
+                {"type": "basic", "name": "Button", "props": {"className": "btn btn-neutral"}, "actions": [{"type": "click", "handler": "sequence", "actions": [{"handler": "setState", "params": {"target": "local", "taskFilters": {"search": "", "status": "", "priority": "", "assigned_to_uuid": null, "due_from": null, "due_to": null, "overdue": false}, "taskPage": 1}}, {"handler": "refetchDataSource", "params": {"dataSourceId": "tasks"}}]}], "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tasks.reset"}]}
+              ]},
+              {"type": "basic", "name": "Div", "if": "{{tasks?.loading}}", "props": {"className": "empty-state"}, "text": "$t:glitter-crm.admin.tasks.loading"},
+              {"type": "basic", "name": "Div", "if": "{{_local.taskLoadFailed === true}}", "props": {"className": "alert-danger"}, "text": "$t:glitter-crm.admin.tasks.load_failed"},
+              {"type": "basic", "name": "Div", "if": "{{!tasks?.loading && _local.taskLoadFailed !== true && (tasks?.data?.data ?? []).length === 0}}", "props": {"className": "empty-state"}, "text": "$t:glitter-crm.admin.tasks.empty"},
+              {
+                "type": "iteration",
+                "source": "{{tasks?.data?.data ?? []}}",
+                "item_var": "task",
+                "template": {
+                  "type": "basic",
+                  "name": "Div",
+                  "props": {"className": "border rounded-lg p-4 mb-3"},
+                  "children": [
+                    {"type": "basic", "name": "Div", "props": {"className": "flex justify-between items-start gap-3"}, "children": [
+                      {"type": "basic", "name": "Div", "props": {"className": "flex flex-wrap gap-2"}, "children": [
+                        {"type": "basic", "name": "Badge", "props": {"variant": "{{task.status === 'completed' ? 'success' : (task.status === 'in_progress' ? 'info' : 'secondary')}}"}, "text": "{{task.status === 'pending' ? '$t:glitter-crm.admin.tasks.status.pending' : (task.status === 'in_progress' ? '$t:glitter-crm.admin.tasks.status.in_progress' : (task.status === 'completed' ? '$t:glitter-crm.admin.tasks.status.completed' : '$t:glitter-crm.admin.tasks.status.cancelled'))}}"},
+                        {"type": "basic", "name": "Badge", "props": {"variant": "{{task.priority === 'urgent' || task.priority === 'high' ? 'warning' : (task.priority === 'normal' ? 'info' : 'secondary')}}"}, "text": "{{task.priority === 'low' ? '$t:glitter-crm.admin.tasks.priority.low' : (task.priority === 'normal' ? '$t:glitter-crm.admin.tasks.priority.normal' : (task.priority === 'high' ? '$t:glitter-crm.admin.tasks.priority.high' : '$t:glitter-crm.admin.tasks.priority.urgent'))}}"},
+                        {"type": "basic", "name": "Badge", "if": "{{task.is_overdue === true}}", "props": {"variant": "warning"}, "text": "$t:glitter-crm.admin.tasks.overdue"}
+                      ]},
+                      {"type": "basic", "name": "Div", "props": {"className": "flex gap-2"}, "children": [
+                        {"type": "basic", "name": "Button", "if": "{{task.abilities?.can_update === true}}", "props": {"className": "btn btn-neutral btn-sm"}, "actions": [{"type": "click", "handler": "sequence", "actions": [
+                          {"handler": "setState", "params": {"target": "local", "taskFormMode": "edit", "selectedTaskUuid": "{{task.uuid}}", "taskFormErrors": null, "taskForm": {"title": "{{task.title}}", "description": "{{task.description}}", "status": "{{task.status}}", "priority": "{{task.priority}}", "assigned_to_uuid": "{{task.assignee?.uuid || null}}", "assignee": "{{task.assignee}}", "due_at": "{{task.due_at ? new Date(new Date(task.due_at).getTime() - new Date(task.due_at).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : null}}"}}},
+                          {"handler": "openModal", "target": "task_form_modal"}
+                        ]}], "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tasks.edit"}]},
+                        {"type": "basic", "name": "Button", "if": "{{task.abilities?.can_delete === true}}", "props": {"className": "btn btn-danger btn-sm"}, "actions": [{"type": "click", "handler": "sequence", "actions": [{"handler": "setState", "params": {"target": "local", "taskDeleteTarget": "{{task.uuid}}"}}, {"handler": "openModal", "target": "delete_task_modal"}]}], "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tasks.delete"}]}
+                      ]}
+                    ]},
+                    {"type": "basic", "name": "Span", "props": {"className": "font-semibold block mt-3"}, "text": "{{task.title}}"},
+                    {"type": "basic", "name": "P", "if": "{{task.description}}", "props": {"className": "text-secondary whitespace-pre-wrap mt-2"}, "text": "{{task.description}}"},
+                    {"type": "basic", "name": "Div", "props": {"className": "text-secondary mt-3"}, "children": [
+                      {"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tasks.fields.due_at"},
+                      {"type": "basic", "name": "Span", "text": "{{task.due_at ? (task.due_at | datetime('YYYY-MM-DD HH:mm')) : '$t:glitter-crm.admin.tasks.due_none'}}"}
+                    ]},
+                    {"type": "basic", "name": "Div", "props": {"className": "text-secondary mt-1"}, "children": [
+                      {"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tasks.fields.assignee"},
+                      {"type": "basic", "name": "Span", "text": "{{task.assignee?.name || '$t:glitter-crm.admin.tasks.assignee_none'}}"},
+                      {"type": "basic", "name": "Span", "if": "{{task.assignee?.email}}", "text": "{{task.assignee.email}}"}
+                    ]},
+                    {"type": "basic", "name": "Div", "if": "{{task.status === 'completed' && task.completed_at}}", "props": {"className": "text-secondary mt-1"}, "children": [
+                      {"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tasks.fields.completed_at"},
+                      {"type": "basic", "name": "Span", "text": "{{task.completed_at | datetime('YYYY-MM-DD HH:mm')}}"}
+                    ]}
+                  ]
+                }
+              },
+              {"type": "composite", "name": "Pagination", "if": "{{(tasks?.data?.meta?.last_page ?? 1) > 1}}", "props": {"currentPage": "{{tasks?.data?.meta?.current_page ?? 1}}", "totalPages": "{{tasks?.data?.meta?.last_page ?? 1}}"}, "actions": [{"event": "onPageChange", "handler": "sequence", "params": {"actions": [{"handler": "setState", "params": {"target": "local", "taskPage": "{{$args[0]}}"}}, {"handler": "refetchDataSource", "params": {"dataSourceId": "tasks"}}]}}]}
+            ]
+          },
+          {
+            "id": "contact_activity_timeline",
+            "type": "basic",
+            "name": "Div",
+            "if": "{{!!route?.id && _local.activityReadable !== false}}",
+            "props": {"className": "admin-card mt-6"},
+            "children": [
+              {
+                "type": "basic",
+                "name": "Div",
+                "props": {"className": "flex justify-between items-start gap-4 mb-5"},
+                "children": [
+                  {
+                    "type": "basic",
+                    "name": "Div",
+                    "children": [
+                      {"type": "basic", "name": "Span", "props": {"className": "card-title"}, "text": "$t:glitter-crm.admin.activities.title"},
+                      {"type": "basic", "name": "P", "props": {"className": "text-secondary mt-1"}, "text": "$t:glitter-crm.admin.activities.description"}
+                    ]
+                  },
+                  {
+                    "id": "create_activity",
+                    "type": "basic",
+                    "name": "Button",
+                    "if": "{{activities?.data?.abilities?.can_create === true}}",
+                    "props": {"className": "btn btn-primary"},
+                    "actions": [
+                      {
+                        "type": "click",
+                        "handler": "sequence",
+                        "actions": [
+                          {"handler": "setState", "params": {"target": "local", "activityFormMode": "create", "selectedActivityUuid": null, "activityFormErrors": null, "activityForm": {"type": "note", "subject": null, "body": null, "occurred_at": "{{new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}}"}}},
+                          {"handler": "openModal", "target": "activity_form_modal"}
+                        ]
+                      }
+                    ],
+                    "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.activities.create"}]
+                  }
+                ]
+              },
+              {
+                "id": "activity_filters",
+                "type": "basic",
+                "name": "Div",
+                "props": {"className": "grid grid-cols-1 md:grid-cols-4 gap-3 mb-4"},
+                "children": [
+                  {"type": "basic", "name": "Input", "props": {"type": "search", "maxLength": 100, "value": "{{_local.activityFilters?.search || ''}}", "placeholder": "$t:glitter-crm.admin.activities.search_placeholder", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "activityFilters.search": "{{$event.target.value}}"}}]},
+                  {
+                    "type": "composite",
+                    "name": "Select",
+                    "props": {
+                      "value": "{{_local.activityFilters?.type || ''}}",
+                      "options": [
+                        {"value": "", "label": "$t:glitter-crm.admin.activities.types.all"},
+                        {"value": "note", "label": "$t:glitter-crm.admin.activities.types.note"},
+                        {"value": "call", "label": "$t:glitter-crm.admin.activities.types.call"},
+                        {"value": "email", "label": "$t:glitter-crm.admin.activities.types.email"},
+                        {"value": "meeting", "label": "$t:glitter-crm.admin.activities.types.meeting"},
+                        {"value": "status_change", "label": "$t:glitter-crm.admin.activities.types.status_change"},
+                        {"value": "system", "label": "$t:glitter-crm.admin.activities.types.system"}
+                      ]
+                    },
+                    "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "activityFilters.type": "{{$event.target.value}}"}}]
+                  },
+                  {"type": "basic", "name": "Input", "props": {"type": "datetime-local", "value": "{{_local.activityFilters?.occurred_from || ''}}", "aria-label": "$t:glitter-crm.admin.activities.occurred_from", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "activityFilters.occurred_from": "{{$event.target.value || null}}"}}]},
+                  {"type": "basic", "name": "Input", "props": {"type": "datetime-local", "value": "{{_local.activityFilters?.occurred_to || ''}}", "aria-label": "$t:glitter-crm.admin.activities.occurred_to", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "activityFilters.occurred_to": "{{$event.target.value || null}}"}}]}
+                ]
+              },
+              {"type": "basic", "name": "Span", "if": "{{!!_local.activityFilters?.occurred_from && !!_local.activityFilters?.occurred_to && _local.activityFilters.occurred_from > _local.activityFilters.occurred_to}}", "props": {"className": "form-error block mb-3"}, "text": "$t:glitter-crm.admin.activities.invalid_date_range"},
+              {
+                "type": "basic",
+                "name": "Div",
+                "props": {"className": "flex gap-2 mb-5"},
+                "children": [
+                  {
+                    "type": "basic",
+                    "name": "Button",
+                    "props": {"className": "btn btn-primary", "disabled": "{{!!_local.activityFilters?.occurred_from && !!_local.activityFilters?.occurred_to && _local.activityFilters.occurred_from > _local.activityFilters.occurred_to}}"},
+                    "actions": [{"type": "click", "handler": "sequence", "actions": [{"handler": "setState", "params": {"target": "local", "activityPage": 1}}, {"handler": "refetchDataSource", "params": {"dataSourceId": "activities"}}]}],
+                    "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.activities.search"}]
+                  },
+                  {
+                    "type": "basic",
+                    "name": "Button",
+                    "props": {"className": "btn btn-neutral"},
+                    "actions": [{"type": "click", "handler": "sequence", "actions": [{"handler": "setState", "params": {"target": "local", "activityFilters": {"search": "", "type": "", "occurred_from": null, "occurred_to": null}, "activityPage": 1}}, {"handler": "refetchDataSource", "params": {"dataSourceId": "activities"}}]}],
+                    "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.activities.reset"}]
+                  }
+                ]
+              },
+              {"type": "basic", "name": "Div", "if": "{{activities?.loading === true}}", "props": {"className": "p-8 text-center"}, "text": "$t:glitter-crm.admin.activities.loading"},
+              {"type": "basic", "name": "Div", "if": "{{_local.activityLoadFailed === true}}", "props": {"className": "alert-danger"}, "text": "$t:glitter-crm.admin.activities.load_failed"},
+              {"type": "basic", "name": "Div", "if": "{{activities?.loading !== true && _local.activityLoadFailed !== true && (activities?.data?.data ?? []).length === 0}}", "props": {"className": "p-8 text-center text-secondary"}, "text": "$t:glitter-crm.admin.activities.empty"},
+              {
+                "id": "activity_item_{{activity.uuid}}",
+                "type": "basic",
+                "name": "Div",
+                "iteration": {"source": "{{activities?.data?.data ?? []}}", "item_var": "activity"},
+                "props": {"className": "border-b py-5"},
+                "children": [
+                  {
+                    "type": "basic",
+                    "name": "Div",
+                    "props": {"className": "flex justify-between gap-4"},
+                    "children": [
+                      {
+                        "type": "basic",
+                        "name": "Div",
+                        "props": {"className": "flex items-center gap-2"},
+                        "children": [
+                          {"type": "composite", "name": "Badge", "props": {"variant": "{{activity.type === 'meeting' ? 'success' : (activity.type === 'status_change' ? 'warning' : (activity.type === 'system' ? 'secondary' : 'info'))}}", "text": "{{activity.type === 'note' ? '$t:glitter-crm.admin.activities.types.note' : (activity.type === 'call' ? '$t:glitter-crm.admin.activities.types.call' : (activity.type === 'email' ? '$t:glitter-crm.admin.activities.types.email' : (activity.type === 'meeting' ? '$t:glitter-crm.admin.activities.types.meeting' : (activity.type === 'status_change' ? '$t:glitter-crm.admin.activities.types.status_change' : '$t:glitter-crm.admin.activities.types.system')))}}"}},
+                          {"type": "basic", "name": "Span", "props": {"className": "text-secondary"}, "text": "{{activity.occurred_at | datetime('YYYY-MM-DD HH:mm')}}"}
+                        ]
+                      },
+                      {
+                        "type": "basic",
+                        "name": "Div",
+                        "props": {"className": "flex gap-2"},
+                        "children": [
+                          {
+                            "type": "basic",
+                            "name": "Button",
+                            "if": "{{activity.abilities?.can_update === true}}",
+                            "props": {"className": "btn btn-sm btn-neutral"},
+                            "actions": [{"type": "click", "handler": "sequence", "actions": [{"handler": "setState", "params": {"target": "local", "activityFormMode": "edit", "selectedActivityUuid": "{{activity.uuid}}", "activityFormErrors": null, "activityForm": {"type": "{{activity.type}}", "subject": "{{activity.subject}}", "body": "{{activity.body}}", "occurred_at": "{{new Date(new Date(activity.occurred_at).getTime() - new Date(activity.occurred_at).getTimezoneOffset() * 60000).toISOString().slice(0, 16)}}"}}}, {"handler": "openModal", "target": "activity_form_modal"}]}],
+                            "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.activities.edit"}]
+                          },
+                          {
+                            "type": "basic",
+                            "name": "Button",
+                            "if": "{{activity.abilities?.can_delete === true}}",
+                            "props": {"className": "btn btn-sm btn-danger"},
+                            "actions": [{"type": "click", "handler": "sequence", "actions": [{"handler": "setState", "params": {"target": "local", "activityDeleteTarget": "{{activity.uuid}}"}}, {"handler": "openModal", "target": "delete_activity_modal"}]}],
+                            "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.activities.delete"}]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {"type": "basic", "name": "Span", "if": "{{!!activity.subject}}", "props": {"className": "font-semibold block mt-3"}, "text": "{{activity.subject}}"},
+                  {"type": "basic", "name": "P", "if": "{{!!activity.body}}", "props": {"className": "whitespace-pre-wrap mt-2"}, "text": "{{activity.body}}"},
+                  {"type": "basic", "name": "Span", "props": {"className": "text-secondary block mt-2"}, "text": "{{activity.creator?.name || (activity.type === 'system' ? '$t:glitter-crm.admin.activities.creator.system' : '$t:glitter-crm.admin.activities.creator.unknown')}}"}
+                ]
+              },
+              {
+                "type": "composite",
+                "name": "Pagination",
+                "if": "{{(activities?.data?.meta?.last_page ?? 1) > 1}}",
+                "props": {"currentPage": "{{activities?.data?.meta?.current_page ?? 1}}", "totalPages": "{{activities?.data?.meta?.last_page ?? 1}}", "showFirstLast": true, "className": "mt-5"},
+                "actions": [{"event": "onPageChange", "handler": "sequence", "params": {"actions": [{"handler": "setState", "params": {"target": "local", "activityPage": "{{$args[0]}}"}}, {"handler": "refetchDataSource", "params": {"dataSourceId": "activities"}}]}}]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "modals": [
+    {
+      "id": "delete_contact_modal",
+      "type": "composite",
+      "name": "Modal",
+      "props": {
+        "title": "$t:glitter-crm.admin.contacts.delete_confirm_title",
+        "description": "$t:glitter-crm.admin.contacts.delete_confirm_description"
+      },
+      "children": [
+        {
+          "type": "basic",
+          "name": "Div",
+          "props": {"className": "flex justify-end gap-2"},
+          "children": [
+            {
+              "type": "basic",
+              "name": "Button",
+              "props": {"className": "btn btn-neutral", "disabled": "{{_local.deleting === true}}"},
+              "actions": [{"type": "click", "handler": "closeModal", "target": "delete_contact_modal"}],
+              "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.cancel"}]
+            },
+            {
+              "type": "basic",
+              "name": "Button",
+              "props": {"className": "btn btn-danger", "disabled": "{{_local.deleting === true}}"},
+              "actions": [
+                {
+                  "type": "click",
+                  "handler": "sequence",
+                  "actions": [
+                    {"handler": "setState", "params": {"target": "local", "deleting": true}},
+                    {
+                      "handler": "apiCall",
+                      "auth_required": true,
+                      "target": "/api/modules/glitter-crm/admin/contacts/{{route.id}}",
+                      "params": {"method": "DELETE"},
+                      "onSuccess": [
+                        {"handler": "toast", "params": {"type": "success", "message": "$t:glitter-crm.admin.contacts.deleted"}},
+                        {"handler": "closeModal", "target": "delete_contact_modal"},
+                        {"handler": "navigate", "params": {"path": "/admin/crm/contacts"}}
+                      ],
+                      "onError": [
+                        {"handler": "setState", "params": {"target": "local", "deleting": false}},
+                        {"handler": "toast", "params": {"type": "error", "message": "$t:glitter-crm.admin.contacts.delete_failed"}}
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "children": [{"type": "basic", "name": "Span", "text": "{{_local.deleting ? '$t:glitter-crm.admin.contacts.deleting' : '$t:glitter-crm.admin.contacts.delete'}}"}]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "task_form_modal",
+      "type": "composite",
+      "name": "Modal",
+      "props": {
+        "title": "{{_local.taskFormMode === 'edit' ? '$t:glitter-crm.admin.tasks.edit_title' : '$t:glitter-crm.admin.tasks.create_title'}}",
+        "description": "$t:glitter-crm.admin.tasks.form_description"
+      },
+      "children": [
+        {
+          "type": "basic",
+          "name": "Div",
+          "props": {"className": "row-stack gap-4"},
+          "children": [
+            {"type": "basic", "name": "Div", "if": "{{_local.taskFormErrors && Object.keys(_local.taskFormErrors).length > 0}}", "props": {"className": "alert-danger"}, "text": "$t:glitter-crm.admin.tasks.save_failed"},
+            {"type": "basic", "name": "Div", "children": [
+              {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.tasks.fields.title"},
+              {"type": "basic", "name": "Input", "props": {"type": "text", "required": true, "maxLength": 255, "value": "{{_local.taskForm?.title || ''}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskForm.title": "{{$event.target.value}}"}}]},
+              {"type": "basic", "name": "Span", "if": "{{_local.taskFormErrors?.title}}", "props": {"className": "form-error"}, "text": "{{_local.taskFormErrors?.title?.[0]}}"}
+            ]},
+            {"type": "basic", "name": "Div", "children": [
+              {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.tasks.fields.description"},
+              {"type": "basic", "name": "Textarea", "props": {"value": "{{_local.taskForm?.description || ''}}", "rows": 4, "className": "textarea w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskForm.description": "{{$event.target.value || null}}"}}]},
+              {"type": "basic", "name": "Span", "if": "{{_local.taskFormErrors?.description}}", "props": {"className": "form-error"}, "text": "{{_local.taskFormErrors?.description?.[0]}}"}
+            ]},
+            {"type": "basic", "name": "Div", "props": {"className": "grid grid-cols-1 md:grid-cols-2 gap-3"}, "children": [
+              {"type": "basic", "name": "Div", "children": [
+                {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.tasks.fields.status"},
+                {"type": "composite", "name": "Select", "props": {"value": "{{_local.taskForm?.status || 'pending'}}", "options": [
+                  {"value": "pending", "label": "$t:glitter-crm.admin.tasks.status.pending"},
+                  {"value": "in_progress", "label": "$t:glitter-crm.admin.tasks.status.in_progress"},
+                  {"value": "completed", "label": "$t:glitter-crm.admin.tasks.status.completed"},
+                  {"value": "cancelled", "label": "$t:glitter-crm.admin.tasks.status.cancelled"}
+                ]}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskForm.status": "{{$event.target.value}}"}}]},
+                {"type": "basic", "name": "Span", "if": "{{_local.taskFormErrors?.status}}", "props": {"className": "form-error"}, "text": "{{_local.taskFormErrors?.status?.[0]}}"}
+              ]},
+              {"type": "basic", "name": "Div", "children": [
+                {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.tasks.fields.priority"},
+                {"type": "composite", "name": "Select", "props": {"value": "{{_local.taskForm?.priority || 'normal'}}", "options": [
+                  {"value": "low", "label": "$t:glitter-crm.admin.tasks.priority.low"},
+                  {"value": "normal", "label": "$t:glitter-crm.admin.tasks.priority.normal"},
+                  {"value": "high", "label": "$t:glitter-crm.admin.tasks.priority.high"},
+                  {"value": "urgent", "label": "$t:glitter-crm.admin.tasks.priority.urgent"}
+                ]}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskForm.priority": "{{$event.target.value}}"}}]},
+                {"type": "basic", "name": "Span", "if": "{{_local.taskFormErrors?.priority}}", "props": {"className": "form-error"}, "text": "{{_local.taskFormErrors?.priority?.[0]}}"}
+              ]}
+            ]},
+            {"type": "basic", "name": "Div", "children": [
+              {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.tasks.fields.assignee"},
+              {"type": "composite", "name": "SearchableDropdown", "props": {
+                "value": "{{_local.taskForm?.assigned_to_uuid}}",
+                "options": "{{_local.taskForm?.assignee ? [{value:_local.taskForm.assignee.uuid,label:_local.taskForm.assignee.name,description:_local.taskForm.assignee.email}] : []}}",
+                "placeholder": "$t:glitter-crm.admin.tasks.assignee_placeholder",
+                "searchPlaceholder": "$t:glitter-crm.admin.tasks.filter_assignee_search",
+                "searchUrl": "/api/admin/users/search",
+                "searchParam": "search",
+                "minSearchLength": 1,
+                "responseMapping": "{{(response.data ?? []).map(user => ({value:user.uuid,label:user.name,description:user.email}))}}",
+                "noResultsText": "$t:glitter-crm.admin.tasks.no_results",
+                "initialText": "$t:glitter-crm.admin.tasks.search_initial",
+                "clearable": true
+              }, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskForm.assigned_to_uuid": "{{$event.target.value || null}}"}}]},
+              {"type": "basic", "name": "Span", "if": "{{_local.taskFormErrors?.assigned_to_uuid}}", "props": {"className": "form-error"}, "text": "{{_local.taskFormErrors?.assigned_to_uuid?.[0]}}"}
+            ]},
+            {"type": "basic", "name": "Div", "children": [
+              {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.tasks.fields.due_at"},
+              {"type": "basic", "name": "Input", "props": {"type": "datetime-local", "value": "{{_local.taskForm?.due_at || ''}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "taskForm.due_at": "{{$event.target.value || null}}"}}]},
+              {"type": "basic", "name": "Span", "if": "{{_local.taskFormErrors?.due_at}}", "props": {"className": "form-error"}, "text": "{{_local.taskFormErrors?.due_at?.[0]}}"}
+            ]},
+            {"type": "basic", "name": "Span", "if": "{{!(_local.taskForm?.title || '').trim()}}", "props": {"className": "form-error"}, "text": "$t:glitter-crm.admin.tasks.title_required"},
+            {"type": "basic", "name": "Div", "props": {"className": "flex justify-end gap-2"}, "children": [
+              {"type": "basic", "name": "Button", "props": {"className": "btn btn-neutral", "disabled": "{{_local.taskSaving === true}}"}, "actions": [{"type": "click", "handler": "closeModal", "target": "task_form_modal"}], "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tasks.cancel"}]},
+              {
+                "type": "basic",
+                "name": "Button",
+                "props": {"className": "btn btn-primary", "disabled": "{{_local.taskSaving === true || !(_local.taskForm?.title || '').trim()}}"},
+                "actions": [{"type": "click", "handler": "sequence", "actions": [
+                  {"handler": "setState", "params": {"target": "local", "taskSaving": true, "taskFormErrors": null}},
+                  {
+                    "handler": "apiCall",
+                    "auth_required": true,
+                    "target": "{{_local.taskFormMode === 'edit' ? '/api/modules/glitter-crm/admin/tasks/' + _local.selectedTaskUuid : '/api/modules/glitter-crm/admin/tasks'}}",
+                    "params": {
+                      "method": "{{_local.taskFormMode === 'edit' ? 'PUT' : 'POST'}}",
+                      "body": "{{_local.taskFormMode === 'edit' ? {assigned_to_uuid:_local.taskForm.assigned_to_uuid || null,title:_local.taskForm.title,description:_local.taskForm.description || null,status:_local.taskForm.status,priority:_local.taskForm.priority,due_at:_local.taskForm.due_at ? new Date(_local.taskForm.due_at).toISOString() : null} : {contact_uuid:route.id,assigned_to_uuid:_local.taskForm.assigned_to_uuid || null,title:_local.taskForm.title,description:_local.taskForm.description || null,status:_local.taskForm.status,priority:_local.taskForm.priority,due_at:_local.taskForm.due_at ? new Date(_local.taskForm.due_at).toISOString() : null}}}"
+                    },
+                    "onSuccess": [
+                      {"handler": "setState", "params": {"target": "local", "taskSaving": false}},
+                      {"handler": "closeModal", "target": "task_form_modal"},
+                      {"handler": "refetchDataSource", "params": {"dataSourceId": "tasks"}},
+                      {"handler": "refetchDataSource", "params": {"dataSourceId": "contact"}},
+                      {"handler": "toast", "params": {"type": "success", "message": "{{_local.taskFormMode === 'edit' ? '$t:glitter-crm.admin.tasks.updated' : '$t:glitter-crm.admin.tasks.created'}}"}}
+                    ],
+                    "onError": [
+                      {"handler": "setState", "params": {"target": "local", "taskSaving": false, "taskFormErrors": "{{error.errors ?? {}}}"}},
+                      {"handler": "toast", "params": {"type": "error", "message": "$t:glitter-crm.admin.tasks.save_failed"}}
+                    ]
+                  }
+                ]}],
+                "children": [{"type": "basic", "name": "Span", "text": "{{_local.taskSaving ? '$t:glitter-crm.admin.tasks.saving' : '$t:glitter-crm.admin.tasks.save'}}"}]
+              }
+            ]}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "delete_task_modal",
+      "type": "composite",
+      "name": "Modal",
+      "props": {"title": "$t:glitter-crm.admin.tasks.delete_confirm_title", "description": "$t:glitter-crm.admin.tasks.delete_confirm_description"},
+      "children": [{"type": "basic", "name": "Div", "props": {"className": "flex justify-end gap-2"}, "children": [
+        {"type": "basic", "name": "Button", "props": {"className": "btn btn-neutral", "disabled": "{{_local.taskDeleting === true}}"}, "actions": [{"type": "click", "handler": "closeModal", "target": "delete_task_modal"}], "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tasks.cancel"}]},
+        {
+          "type": "basic",
+          "name": "Button",
+          "props": {"className": "btn btn-danger", "disabled": "{{_local.taskDeleting === true}}"},
+          "actions": [{"type": "click", "handler": "sequence", "actions": [
+            {"handler": "setState", "params": {"target": "local", "taskDeleting": true}},
+            {
+              "handler": "apiCall",
+              "auth_required": true,
+              "target": "/api/modules/glitter-crm/admin/tasks/{{_local.taskDeleteTarget}}",
+              "params": {"method": "DELETE"},
+              "onSuccess": [
+                {"handler": "refetchDataSource", "params": {"dataSourceId": "tasks"}},
+                {"handler": "refetchDataSource", "params": {"dataSourceId": "contact"}},
+                {"handler": "closeModal", "target": "delete_task_modal"},
+                {"handler": "setState", "params": {"target": "local", "taskDeleting": false, "taskDeleteTarget": null}},
+                {"handler": "toast", "params": {"type": "success", "message": "$t:glitter-crm.admin.tasks.deleted"}}
+              ],
+              "onError": [
+                {"handler": "setState", "params": {"target": "local", "taskDeleting": false}},
+                {"handler": "toast", "params": {"type": "error", "message": "$t:glitter-crm.admin.tasks.delete_failed"}}
+              ]
+            }
+          ]}],
+          "children": [{"type": "basic", "name": "Span", "text": "{{_local.taskDeleting ? '$t:glitter-crm.admin.tasks.deleting' : '$t:glitter-crm.admin.tasks.delete'}}"}]
+        }
+      ]}]
+    },
+    {
+      "id": "activity_form_modal",
+      "type": "composite",
+      "name": "Modal",
+      "props": {
+        "title": "{{_local.activityFormMode === 'edit' ? '$t:glitter-crm.admin.activities.edit_title' : '$t:glitter-crm.admin.activities.create_title'}}",
+        "description": "$t:glitter-crm.admin.activities.form_description"
+      },
+      "children": [
+        {
+          "type": "basic",
+          "name": "Div",
+          "props": {"className": "row-stack gap-4"},
+          "children": [
+            {"type": "basic", "name": "Div", "if": "{{_local.activityFormErrors && Object.keys(_local.activityFormErrors).length > 0}}", "props": {"className": "alert-danger"}, "text": "$t:glitter-crm.admin.activities.save_failed"},
+            {
+              "type": "basic",
+              "name": "Div",
+              "children": [
+                {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.activities.fields.type"},
+                {
+                  "type": "composite",
+                  "name": "Select",
+                  "props": {
+                    "value": "{{_local.activityForm?.type || 'note'}}",
+                    "options": [
+                      {"value": "note", "label": "$t:glitter-crm.admin.activities.types.note"},
+                      {"value": "call", "label": "$t:glitter-crm.admin.activities.types.call"},
+                      {"value": "email", "label": "$t:glitter-crm.admin.activities.types.email"},
+                      {"value": "meeting", "label": "$t:glitter-crm.admin.activities.types.meeting"},
+                      {"value": "status_change", "label": "$t:glitter-crm.admin.activities.types.status_change"}
+                    ]
+                  },
+                  "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "activityForm.type": "{{$event.target.value}}"}}]
+                },
+                {"type": "basic", "name": "Span", "if": "{{_local.activityFormErrors?.type}}", "props": {"className": "form-error"}, "text": "{{_local.activityFormErrors?.type?.[0]}}"}
+              ]
+            },
+            {
+              "type": "basic",
+              "name": "Div",
+              "children": [
+                {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.activities.fields.subject"},
+                {"type": "basic", "name": "Input", "props": {"type": "text", "maxLength": 255, "value": "{{_local.activityForm?.subject || ''}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "activityForm.subject": "{{$event.target.value || null}}"}}]},
+                {"type": "basic", "name": "Span", "if": "{{_local.activityFormErrors?.subject}}", "props": {"className": "form-error"}, "text": "{{_local.activityFormErrors?.subject?.[0]}}"}
+              ]
+            },
+            {
+              "type": "basic",
+              "name": "Div",
+              "children": [
+                {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.activities.fields.body"},
+                {"type": "basic", "name": "Textarea", "props": {"value": "{{_local.activityForm?.body || ''}}", "rows": 5, "className": "textarea w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "activityForm.body": "{{$event.target.value || null}}"}}]},
+                {"type": "basic", "name": "Span", "if": "{{_local.activityFormErrors?.body}}", "props": {"className": "form-error"}, "text": "{{_local.activityFormErrors?.body?.[0]}}"}
+              ]
+            },
+            {
+              "type": "basic",
+              "name": "Div",
+              "children": [
+                {"type": "basic", "name": "Label", "props": {"className": "form-label"}, "text": "$t:glitter-crm.admin.activities.fields.occurred_at"},
+                {"type": "basic", "name": "Input", "props": {"type": "datetime-local", "value": "{{_local.activityForm?.occurred_at || ''}}", "className": "input w-full"}, "actions": [{"type": "change", "handler": "setState", "params": {"target": "local", "activityForm.occurred_at": "{{$event.target.value || null}}"}}]},
+                {"type": "basic", "name": "Span", "if": "{{_local.activityFormErrors?.occurred_at}}", "props": {"className": "form-error"}, "text": "{{_local.activityFormErrors?.occurred_at?.[0]}}"}
+              ]
+            },
+            {"type": "basic", "name": "Span", "if": "{{!(_local.activityForm?.subject || '').trim() && !(_local.activityForm?.body || '').trim()}}", "props": {"className": "form-error"}, "text": "$t:glitter-crm.admin.activities.subject_or_body_required"},
+            {
+              "type": "basic",
+              "name": "Div",
+              "props": {"className": "flex justify-end gap-2"},
+              "children": [
+                {"type": "basic", "name": "Button", "props": {"className": "btn btn-neutral", "disabled": "{{_local.activitySaving === true}}"}, "actions": [{"type": "click", "handler": "closeModal", "target": "activity_form_modal"}], "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.activities.cancel"}]},
+                {
+                  "type": "basic",
+                  "name": "Button",
+                  "props": {"className": "btn btn-primary", "disabled": "{{_local.activitySaving === true || !_local.activityForm?.occurred_at || (!(_local.activityForm?.subject || '').trim() && !(_local.activityForm?.body || '').trim())}}"},
+                  "actions": [
+                    {
+                      "type": "click",
+                      "handler": "sequence",
+                      "actions": [
+                        {"handler": "setState", "params": {"target": "local", "activitySaving": true, "activityFormErrors": null}},
+                        {
+                          "handler": "apiCall",
+                          "auth_required": true,
+                          "target": "{{_local.activityFormMode === 'edit' ? '/api/modules/glitter-crm/admin/activities/' + _local.selectedActivityUuid : '/api/modules/glitter-crm/admin/activities'}}",
+                          "params": {
+                            "method": "{{_local.activityFormMode === 'edit' ? 'PUT' : 'POST'}}",
+                            "body": "{{_local.activityFormMode === 'edit' ? {type:_local.activityForm.type,subject:_local.activityForm.subject || null,body:_local.activityForm.body || null,occurred_at:new Date(_local.activityForm.occurred_at).toISOString()} : {contact_uuid:route.id,type:_local.activityForm.type,subject:_local.activityForm.subject || null,body:_local.activityForm.body || null,occurred_at:new Date(_local.activityForm.occurred_at).toISOString()}}}"
+                          },
+                          "onSuccess": [
+                            {"handler": "setState", "params": {"target": "local", "activitySaving": false}},
+                            {"handler": "closeModal", "target": "activity_form_modal"},
+                            {"handler": "refetchDataSource", "params": {"dataSourceId": "activities"}},
+                            {"handler": "refetchDataSource", "params": {"dataSourceId": "contact"}},
+                            {"handler": "toast", "params": {"type": "success", "message": "{{_local.activityFormMode === 'edit' ? '$t:glitter-crm.admin.activities.updated' : '$t:glitter-crm.admin.activities.created'}}"}}
+                          ],
+                          "onError": [
+                            {"handler": "setState", "params": {"target": "local", "activitySaving": false, "activityFormErrors": "{{error.errors ?? {}}}"}},
+                            {"handler": "toast", "params": {"type": "error", "message": "$t:glitter-crm.admin.activities.save_failed"}}
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "children": [{"type": "basic", "name": "Span", "text": "{{_local.activitySaving ? '$t:glitter-crm.admin.activities.saving' : '$t:glitter-crm.admin.activities.save'}}"}]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "delete_activity_modal",
+      "type": "composite",
+      "name": "Modal",
+      "props": {"title": "$t:glitter-crm.admin.activities.delete_confirm_title", "description": "$t:glitter-crm.admin.activities.delete_confirm_description"},
+      "children": [
+        {
+          "type": "basic",
+          "name": "Div",
+          "props": {"className": "flex justify-end gap-2"},
+          "children": [
+            {"type": "basic", "name": "Button", "props": {"className": "btn btn-neutral", "disabled": "{{_local.activityDeleting === true}}"}, "actions": [{"type": "click", "handler": "closeModal", "target": "delete_activity_modal"}], "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.activities.cancel"}]},
+            {
+              "type": "basic",
+              "name": "Button",
+              "props": {"className": "btn btn-danger", "disabled": "{{_local.activityDeleting === true}}"},
+              "actions": [
+                {
+                  "type": "click",
+                  "handler": "sequence",
+                  "actions": [
+                    {"handler": "setState", "params": {"target": "local", "activityDeleting": true}},
+                    {
+                      "handler": "apiCall",
+                      "auth_required": true,
+                      "target": "/api/modules/glitter-crm/admin/activities/{{_local.activityDeleteTarget}}",
+                      "params": {"method": "DELETE"},
+                      "onSuccess": [
+                        {"handler": "refetchDataSource", "params": {"dataSourceId": "activities"}},
+                        {"handler": "refetchDataSource", "params": {"dataSourceId": "contact"}},
+                        {"handler": "closeModal", "target": "delete_activity_modal"},
+                        {"handler": "setState", "params": {"target": "local", "activityDeleting": false, "activityDeleteTarget": null}},
+                        {"handler": "toast", "params": {"type": "success", "message": "$t:glitter-crm.admin.activities.deleted"}}
+                      ],
+                      "onError": [
+                        {"handler": "setState", "params": {"target": "local", "activityDeleting": false}},
+                        {"handler": "toast", "params": {"type": "error", "message": "$t:glitter-crm.admin.activities.delete_failed"}}
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "children": [{"type": "basic", "name": "Span", "text": "{{_local.activityDeleting ? '$t:glitter-crm.admin.activities.deleting' : '$t:glitter-crm.admin.activities.delete'}}"}]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

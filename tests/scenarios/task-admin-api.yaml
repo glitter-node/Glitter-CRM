@@ -1,0 +1,16 @@
+name: task-admin-api
+description: UUID 기반 Task 관리자 CRUD와 Contact nested 목록 계약을 검증한다.
+steps:
+  - reject_unauthenticated_and_unauthorized_requests
+  - enforce_task_read_create_update_delete_permissions
+  - create_task_by_contact_and_assignee_uuid
+  - list_search_filter_sort_and_paginate_tasks
+  - list_only_route_contact_tasks
+  - serialize_public_contact_and_assignee_fields_without_internal_ids
+  - validate_status_priority_due_range_metadata_and_overdue
+  - maintain_completed_at_from_status_transitions
+  - calculate_is_overdue_with_strict_past_boundary
+  - soft_delete_task_and_recalculate_contact_next_task_at
+  - reject_numeric_and_invalid_route_identifiers
+  - verify_no_patch_action_nested_post_restore_or_force_delete_routes
+  - verify_no_task_admin_ui_notification_observer_or_queue

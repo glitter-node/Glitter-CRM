@@ -1,0 +1,33 @@
+# audit:allow test-scenario-coverage reason: |
+#   Contact 관리자 UI의 선언 구조와 payload는 ContactAdminUiStructureTest 및
+#   admin-contact-layouts.test.ts가 검증한다.
+feature: glitter-crm Contact 관리자 UI
+
+description: |
+  관리자는 read 권한으로 고객 목록에 진입하고 기존 Contact API를 사용해 검색,
+  필터, 등록, UUID 기반 조회·수정 및 soft delete를 수행한다.
+
+axes:
+  screen: [index, create, edit]
+  permission: [read, create, update, delete, missing]
+  state: [loading, empty, loaded, validation_error, request_error]
+
+effects:
+  - crm_menu_exposes_only_contact
+  - contact_menu_requires_read_permission
+  - contact_list_uses_existing_api
+  - search_filter_sort_and_pagination_reset_page
+  - user_links_use_public_uuid_search
+  - create_and_update_payload_excludes_internal_fields
+  - metadata_and_last_activity_are_not_editable
+  - buttons_follow_resource_abilities
+  - delete_requires_confirmation_and_calls_soft_delete_api
+  - visible_text_uses_frontend_translation_keys
+
+test_files:
+  - modules/_bundled/glitter-crm/tests/Unit/ContactAdminUiStructureTest.php
+  - modules/_bundled/glitter-crm/resources/js/__tests__/layouts/admin-contact-layouts.test.ts
+
+notes: |
+  UI 시나리오 runner에는 브라우저 action schema가 없으므로 검증된 scenario
+  manifest 형식으로 선언하고 JSON layout render 및 정적 계약 테스트로 실행한다.

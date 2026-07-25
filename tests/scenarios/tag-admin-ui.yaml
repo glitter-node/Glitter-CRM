@@ -1,0 +1,11 @@
+name: tag-admin-ui
+description: CRM Tag 관리자 화면과 Contact 다중 Tag 선택의 정적·격리 계약을 검증한다.
+steps:
+  - show_tag_menu_for_read_permission
+  - list_search_sort_and_paginate_tags
+  - create_and_edit_tag_by_uuid
+  - enforce_item_abilities
+  - confirm_soft_delete_and_refetch
+  - select_multiple_tags_by_uuid
+  - preserve_tags_without_read_permission
+  - sync_or_clear_contact_tags_atomically

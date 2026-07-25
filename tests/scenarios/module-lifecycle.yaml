@@ -1,0 +1,36 @@
+# audit:allow test-scenario-coverage reason: |
+#   Phase 1은 도메인 분기 기능이 아니라 순차 lifecycle smoke다. lifecycle_stage는
+#   독립 cross product가 아니라 discover → install → activate → deactivate →
+#   uninstall의 단일 상태 전이이며, locale 축은 동일 선언에 대한 ko/en parity다.
+#   두 test_files가 각 전이와 번역 parity 및 모든 effects를 직접 단언한다.
+feature: glitter-crm 모듈 스켈레톤 lifecycle
+
+description: |
+  필수 선택 모듈 없이 glitter-crm을 발견하고 설치한 뒤 활성화, 비활성화,
+  기본 제거할 수 있는지 검증한다. 현재 Contact·Tag·Activity 사용자 기능과
+  Task 관리자 API를 제공하며 Task UI는 아직 제공하지 않는다.
+
+axes:
+  lifecycle_stage: [discovered, installed, active, inactive, uninstalled]
+  locale: [ko, en]
+
+effects:
+  - bundled_manifest_is_discovered
+  - metadata_identifier_vendor_author_and_version_are_consistent
+  - service_provider_loads_contact_tag_activity_and_task_repository_bindings
+  - permissions_are_registered_for_admin_role
+  - contact_admin_menu_points_to_registered_layout
+  - backend_and_frontend_translations_are_available
+  - install_copies_bundled_source_to_active_output
+  - activate_changes_module_status_to_active
+  - deactivate_changes_module_status_to_inactive
+  - uninstall_removes_module_record_and_preserves_declarations
+  - existing_admin_routes_include_task_api_without_task_ui_or_lead_routes
+
+test_files:
+  - modules/_bundled/glitter-crm/tests/Feature/ModuleSkeletonTest.php
+  - modules/_bundled/glitter-crm/tests/Feature/ModuleLifecycleTest.php
+
+notes: |
+  locale axis는 metadata와 backend/frontend 번역 parity 테스트가 담당한다.
+  lifecycle_stage axis는 단일 순차 lifecycle 테스트가 실제 Artisan 명령으로 검증한다.

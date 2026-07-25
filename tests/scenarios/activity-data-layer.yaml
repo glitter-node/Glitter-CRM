@@ -1,0 +1,11 @@
+name: activity-data-layer
+description: CRM Activity 데이터와 Contact 최근 활동 시각 계약을 검증한다.
+steps:
+  - create_activity_with_contact_and_creator_public_uuids
+  - normalize_timezone_aware_occurred_at_to_utc
+  - filter_search_and_order_activities
+  - reject_invalid_type_uuid_datetime_and_metadata
+  - prevent_contact_creator_and_uuid_reassignment
+  - soft_delete_activity
+  - recalculate_contact_last_activity_at_in_transaction
+  - cascade_on_physical_contact_delete

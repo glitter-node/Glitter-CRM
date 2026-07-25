@@ -1,0 +1,11 @@
+name: tag-admin-api
+description: CRM Tag 관리자 CRUD API의 인증, 권한, UUID, validation과 soft delete를 검증한다.
+steps:
+  - reject_unauthenticated_request
+  - authorize_each_tag_crud_permission
+  - create_tag_with_unicode_slug
+  - paginate_search_and_sort_tags
+  - show_and_update_tag_by_uuid
+  - reject_reserved_slug
+  - soft_delete_tag_and_preserve_pivot
+  - reject_numeric_invalid_and_deleted_route_keys

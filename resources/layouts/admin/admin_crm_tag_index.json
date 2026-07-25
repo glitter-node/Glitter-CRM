@@ -1,0 +1,301 @@
+{
+  "version": "1.3.3",
+  "layout_name": "admin_crm_tag_index",
+  "permissions": ["glitter-crm.tags.read"],
+  "extends": "_admin_base",
+  "meta": {
+    "title": "$t:glitter-crm.admin.tags.title",
+    "description": "$t:glitter-crm.admin.tags.description"
+  },
+  "state": {
+    "searchQuery": "",
+    "deleteUuid": null,
+    "deleting": false
+  },
+  "transition_overlay": {"wait_for": ["tags"]},
+  "init_actions": [
+    {
+      "handler": "setState",
+      "params": {"target": "local", "searchQuery": "{{query.search || ''}}"}
+    }
+  ],
+  "data_sources": [
+    {
+      "id": "tags",
+      "type": "api",
+      "endpoint": "/api/modules/glitter-crm/admin/tags",
+      "method": "GET",
+      "auto_fetch": true,
+      "auth_required": true,
+      "params": {
+        "search": "{{query.search}}",
+        "sort": "{{query.sort || 'name'}}",
+        "direction": "{{query.direction || 'asc'}}",
+        "per_page": "{{query.per_page || 20}}",
+        "page": "{{query.page || 1}}"
+      },
+      "errorHandling": {
+        "403": {"handler": "showErrorPage", "params": {"target": "content"}},
+        "default": {"handler": "toast", "params": {"type": "error", "message": "$t:glitter-crm.admin.tags.load_failed"}}
+      },
+      "fallback": {
+        "data": {
+          "data": [],
+          "meta": {"current_page": 1, "last_page": 1, "per_page": 20, "total": 0},
+          "abilities": {"can_create": false}
+        }
+      }
+    }
+  ],
+  "slots": {
+    "content": [
+      {
+        "id": "tag_index",
+        "type": "basic",
+        "name": "Div",
+        "props": {"className": "admin-page-content-fluid"},
+        "children": [
+          {
+            "id": "tag_header",
+            "type": "composite",
+            "name": "PageHeader",
+            "props": {
+              "title": "$t:glitter-crm.admin.tags.title",
+              "description": "$t:glitter-crm.admin.tags.description"
+            },
+            "children": [
+              {
+                "id": "create_tag",
+                "type": "basic",
+                "name": "Button",
+                "if": "{{tags?.data?.abilities?.can_create === true}}",
+                "props": {"className": "btn btn-primary"},
+                "actions": [{"type": "click", "handler": "navigate", "params": {"path": "/admin/crm/tags/create"}}],
+                "children": [
+                  {"type": "basic", "name": "Icon", "props": {"name": "plus", "size": "sm"}},
+                  {"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tags.create"}
+                ]
+              }
+            ]
+          },
+          {
+            "id": "tag_filters",
+            "type": "basic",
+            "name": "Div",
+            "props": {"className": "admin-card mb-4"},
+            "children": [
+              {
+                "type": "basic",
+                "name": "Div",
+                "props": {"className": "flex-center flex-row gap-3 flex-wrap"},
+                "children": [
+                  {
+                    "id": "tag_search",
+                    "type": "basic",
+                    "name": "Input",
+                    "props": {
+                      "type": "text",
+                      "value": "{{_local.searchQuery || ''}}",
+                      "placeholder": "$t:glitter-crm.admin.tags.search_placeholder",
+                      "className": "flex-1 min-w-64"
+                    },
+                    "actions": [
+                      {"type": "change", "handler": "setState", "params": {"target": "local", "searchQuery": "{{$event.target.value}}"}},
+                      {
+                        "type": "keypress",
+                        "key": "Enter",
+                        "handler": "navigate",
+                        "params": {"path": "/admin/crm/tags", "mergeQuery": true, "query": {"search": "{{$event.target.value}}", "page": 1}}
+                      }
+                    ]
+                  },
+                  {
+                    "type": "basic",
+                    "name": "Button",
+                    "props": {"className": "btn btn-primary"},
+                    "actions": [
+                      {
+                        "type": "click",
+                        "handler": "navigate",
+                        "params": {"path": "/admin/crm/tags", "mergeQuery": true, "query": {"search": "{{_local.searchQuery}}", "page": 1}}
+                      }
+                    ],
+                    "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tags.search"}]
+                  },
+                  {
+                    "type": "basic",
+                    "name": "Button",
+                    "props": {"className": "btn btn-neutral"},
+                    "actions": [{"type": "click", "handler": "navigate", "params": {"path": "/admin/crm/tags", "mergeQuery": false}}],
+                    "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tags.reset"}]
+                  },
+                  {
+                    "id": "tag_sort",
+                    "type": "composite",
+                    "name": "Select",
+                    "props": {
+                      "value": "{{(query.sort || 'name') + '_' + (query.direction || 'asc')}}",
+                      "className": "w-48",
+                      "options": [
+                        {"label": "$t:glitter-crm.admin.tags.sort.name_asc", "value": "name_asc"},
+                        {"label": "$t:glitter-crm.admin.tags.sort.name_desc", "value": "name_desc"},
+                        {"label": "$t:glitter-crm.admin.tags.sort.slug_asc", "value": "slug_asc"},
+                        {"label": "$t:glitter-crm.admin.tags.sort.newest", "value": "updated_at_desc"}
+                      ]
+                    },
+                    "actions": [
+                      {
+                        "type": "change",
+                        "handler": "navigate",
+                        "params": {
+                          "path": "/admin/crm/tags",
+                          "mergeQuery": true,
+                          "query": {
+                            "sort": "{{$event.target.value.split('_').slice(0,-1).join('_')}}",
+                            "direction": "{{$event.target.value.split('_').pop()}}",
+                            "page": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "tags_grid",
+            "type": "composite",
+            "name": "DataGrid",
+            "blur_until_loaded": true,
+            "dataKey": "tags",
+            "props": {
+              "columns": [
+                {"field": "name", "header": "$t:glitter-crm.admin.tags.fields.name", "sortable": true},
+                {"field": "slug", "header": "$t:glitter-crm.admin.tags.fields.slug", "sortable": true},
+                {
+                  "field": "color",
+                  "header": "$t:glitter-crm.admin.tags.fields.color",
+                  "cellChildren": [
+                    {
+                      "type": "basic",
+                      "name": "Div",
+                      "props": {"className": "flex items-center gap-2"},
+                      "children": [
+                        {"type": "basic", "name": "Div", "if": "{{!!row.color}}", "props": {"className": "w-4 h-4 rounded border", "style": "background-color: {{row.color}}"}},
+                        {"type": "basic", "name": "Span", "text": "{{row.color || '$t:glitter-crm.admin.tags.no_color'}}"}
+                      ]
+                    }
+                  ]
+                },
+                {"field": "updated_at", "header": "$t:glitter-crm.admin.tags.fields.updated_at", "sortable": true}
+              ],
+              "data": "{{tags?.data?.data}}",
+              "sortable": true,
+              "sortField": "{{query.sort || 'name'}}",
+              "sortDirection": "{{query.direction || 'asc'}}",
+              "pagination": true,
+              "alwaysShowPagination": true,
+              "pageSize": "{{tags?.data?.meta?.per_page ?? 20}}",
+              "serverSidePagination": true,
+              "serverCurrentPage": "{{tags?.data?.meta?.current_page ?? 1}}",
+              "serverTotalPages": "{{tags?.data?.meta?.last_page ?? 1}}",
+              "idField": "uuid",
+              "emptyMessage": "$t:glitter-crm.admin.tags.empty",
+              "rowActions": [
+                {"id": "edit", "label": "$t:glitter-crm.admin.tags.edit", "iconName": "pencil", "disabledField": "abilities.can_update"},
+                {"id": "delete", "label": "$t:glitter-crm.admin.tags.delete", "iconName": "trash", "variant": "danger", "disabledField": "abilities.can_delete"}
+              ],
+              "actionsColumnHeader": "$t:glitter-crm.admin.tags.fields.actions"
+            },
+            "actions": [
+              {
+                "event": "onSortChange",
+                "type": "change",
+                "handler": "navigate",
+                "params": {"path": "/admin/crm/tags", "mergeQuery": true, "query": {"sort": "{{$args[0]}}", "direction": "{{$args[1]}}", "page": 1}}
+              },
+              {
+                "event": "onPageChange",
+                "type": "change",
+                "handler": "navigate",
+                "params": {"path": "/admin/crm/tags", "mergeQuery": true, "query": {"page": "{{$args[0]}}"}}
+              },
+              {
+                "event": "onRowAction",
+                "type": "action",
+                "handler": "switch",
+                "cases": {
+                  "edit": {"handler": "navigate", "params": {"path": "/admin/crm/tags/{{$args[1].uuid}}/edit"}},
+                  "delete": {
+                    "handler": "sequence",
+                    "actions": [
+                      {"handler": "setState", "params": {"target": "local", "deleteUuid": "{{$args[1].uuid}}", "deleting": false}},
+                      {"handler": "openModal", "target": "delete_tag_modal"}
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "modals": [
+    {
+      "id": "delete_tag_modal",
+      "type": "composite",
+      "name": "Modal",
+      "props": {
+        "title": "$t:glitter-crm.admin.tags.delete_confirm_title",
+        "description": "$t:glitter-crm.admin.tags.delete_confirm_description"
+      },
+      "children": [
+        {
+          "type": "basic",
+          "name": "Div",
+          "props": {"className": "flex justify-end gap-2"},
+          "children": [
+            {
+              "type": "basic",
+              "name": "Button",
+              "props": {"className": "btn btn-neutral", "disabled": "{{_local.deleting === true}}"},
+              "actions": [{"type": "click", "handler": "closeModal", "target": "delete_tag_modal"}],
+              "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.tags.cancel"}]
+            },
+            {
+              "type": "basic",
+              "name": "Button",
+              "props": {"className": "btn btn-danger", "disabled": "{{_local.deleting === true}}"},
+              "actions": [
+                {
+                  "type": "click",
+                  "handler": "sequence",
+                  "actions": [
+                    {"handler": "setState", "params": {"target": "local", "deleting": true}},
+                    {
+                      "handler": "apiCall",
+                      "target": "/api/modules/glitter-crm/admin/tags/{{_local.deleteUuid}}",
+                      "params": {"method": "DELETE"},
+                      "onSuccess": [
+                        {"handler": "toast", "params": {"type": "success", "message": "$t:glitter-crm.admin.tags.deleted"}},
+                        {"handler": "refetchDataSource", "params": {"dataSourceId": "tags"}},
+                        {"handler": "closeModal", "target": "delete_tag_modal"}
+                      ],
+                      "onError": [
+                        {"handler": "setState", "params": {"target": "local", "deleting": false}},
+                        {"handler": "toast", "params": {"type": "error", "message": "$t:glitter-crm.admin.tags.delete_failed"}}
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "children": [{"type": "basic", "name": "Span", "text": "{{_local.deleting ? '$t:glitter-crm.admin.tags.deleting' : '$t:glitter-crm.admin.tags.delete'}}"}]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

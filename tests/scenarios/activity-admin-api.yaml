@@ -1,0 +1,12 @@
+name: activity-admin-api
+description: CRM Activity 관리자 API와 system 기록 보호를 검증한다.
+steps:
+  - require_admin_authentication_and_activity_permissions
+  - create_activity_for_contact_with_authenticated_creator
+  - list_search_filter_sort_and_paginate_activities
+  - list_only_route_contact_activities
+  - show_and_update_activity_by_public_uuid
+  - reject_system_type_admin_creation
+  - expose_system_activity_read_only_with_false_abilities
+  - soft_delete_activity_and_recalculate_contact_last_activity
+  - reject_patch_restore_force_delete_and_nested_create_routes

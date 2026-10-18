@@ -1,0 +1,418 @@
+{
+  "version": "1.3.3",
+  "layout_name": "admin_crm_contact_index",
+  "permissions": ["glitter-crm.contacts.read"],
+  "extends": "_admin_base",
+  "meta": {
+    "title": "$t:glitter-crm.admin.contacts.title",
+    "description": "$t:glitter-crm.admin.contacts.description"
+  },
+  "state": {
+    "searchQuery": "",
+    "assigneeOptions": []
+  },
+  "transition_overlay": {
+    "wait_for": ["contacts"]
+  },
+  "init_actions": [
+    {
+      "handler": "setState",
+      "params": {
+        "target": "local",
+        "searchQuery": "{{query.keyword || ''}}"
+      }
+    }
+  ],
+  "data_sources": [
+    {
+      "id": "contacts",
+      "type": "api",
+      "endpoint": "/api/modules/glitter-crm/admin/contacts",
+      "method": "GET",
+      "auto_fetch": true,
+      "auth_required": true,
+      "params": {
+        "keyword": "{{query.keyword}}",
+        "status": "{{query.status}}",
+        "assigned_user_id": "{{query.assigned_user_id}}",
+        "sort": "{{query.sort || 'created_at'}}",
+        "direction": "{{query.direction || 'desc'}}",
+        "per_page": "{{query.per_page || 20}}",
+        "page": "{{query.page || 1}}"
+      },
+      "errorHandling": {
+        "403": {"handler": "showErrorPage", "params": {"target": "content"}},
+        "default": {
+          "handler": "toast",
+          "params": {"type": "error", "message": "$t:glitter-crm.admin.contacts.load_failed"}
+        }
+      },
+      "fallback": {
+        "data": {
+          "data": [],
+          "meta": {"current_page": 1, "last_page": 1, "per_page": 20, "total": 0},
+          "abilities": {"can_create": false, "can_update": false, "can_delete": false}
+        }
+      }
+    }
+  ],
+  "slots": {
+    "content": [
+      {
+        "id": "contact_index",
+        "type": "basic",
+        "name": "Div",
+        "props": {"className": "admin-page-content-fluid"},
+        "children": [
+          {
+            "id": "contact_header",
+            "type": "composite",
+            "name": "PageHeader",
+            "props": {
+              "title": "$t:glitter-crm.admin.contacts.title",
+              "description": "$t:glitter-crm.admin.contacts.description"
+            },
+            "children": [
+              {
+                "id": "create_contact",
+                "type": "basic",
+                "name": "Button",
+                "props": {
+                  "className": "btn btn-primary",
+                  "disabled": "{{contacts?.data?.abilities?.can_create !== true}}"
+                },
+                "actions": [
+                  {"type": "click", "handler": "navigate", "params": {"path": "/admin/crm/contacts/create"}}
+                ],
+                "children": [
+                  {"type": "basic", "name": "Icon", "props": {"name": "plus", "size": "sm"}},
+                  {"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.create"}
+                ]
+              }
+            ]
+          },
+          {
+            "id": "contact_filters",
+            "type": "basic",
+            "name": "Div",
+            "props": {"className": "admin-card mb-4"},
+            "children": [
+              {
+                "type": "basic",
+                "name": "Div",
+                "props": {"className": "flex-center flex-row gap-3 flex-wrap"},
+                "children": [
+                  {
+                    "id": "contact_search",
+                    "type": "basic",
+                    "name": "Input",
+                    "props": {
+                      "type": "text",
+                      "value": "{{_local.searchQuery || ''}}",
+                      "placeholder": "$t:glitter-crm.admin.contacts.search_placeholder",
+                      "className": "flex-1 min-w-64"
+                    },
+                    "actions": [
+                      {"type": "change", "handler": "setState", "params": {"target": "local", "searchQuery": "{{$event.target.value}}"}},
+                      {
+                        "type": "keypress",
+                        "key": "Enter",
+                        "handler": "navigate",
+                        "params": {
+                          "path": "/admin/crm/contacts",
+                          "mergeQuery": true,
+                          "query": {"keyword": "{{$event.target.value}}", "page": 1}
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "contact_search_button",
+                    "type": "basic",
+                    "name": "Button",
+                    "props": {"className": "btn btn-primary"},
+                    "actions": [
+                      {
+                        "type": "click",
+                        "handler": "navigate",
+                        "params": {
+                          "path": "/admin/crm/contacts",
+                          "mergeQuery": true,
+                          "query": {"keyword": "{{_local.searchQuery}}", "page": 1}
+                        }
+                      }
+                    ],
+                    "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.search"}]
+                  },
+                  {
+                    "id": "contact_filter_reset",
+                    "type": "basic",
+                    "name": "Button",
+                    "props": {"className": "btn btn-neutral"},
+                    "actions": [
+                      {
+                        "type": "click",
+                        "handler": "navigate",
+                        "params": {"path": "/admin/crm/contacts", "mergeQuery": false}
+                      }
+                    ],
+                    "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.reset"}]
+                  },
+                  {
+                    "id": "contact_status_filter",
+                    "type": "composite",
+                    "name": "Select",
+                    "props": {
+                      "value": "{{query.status || ''}}",
+                      "className": "w-40",
+                      "options": [
+                        {"label": "$t:glitter-crm.admin.contacts.all_statuses", "value": ""},
+                        {"label": "$t:glitter-crm.admin.contacts.status.active", "value": "active"},
+                        {"label": "$t:glitter-crm.admin.contacts.status.inactive", "value": "inactive"},
+                        {"label": "$t:glitter-crm.admin.contacts.status.archived", "value": "archived"}
+                      ]
+                    },
+                    "actions": [
+                      {
+                        "type": "change",
+                        "handler": "navigate",
+                        "params": {
+                          "path": "/admin/crm/contacts",
+                          "mergeQuery": true,
+                          "query": {"status": "{{$event.target.value}}", "page": 1}
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "contact_assignee_filter",
+                    "type": "composite",
+                    "name": "SearchableDropdown",
+                    "props": {
+                      "options": "{{_local.assigneeOptions ?? []}}",
+                      "value": "{{query.assigned_user_id || ''}}",
+                      "triggerLabel": "$t:glitter-crm.admin.contacts.all_assignees",
+                      "searchPlaceholder": "$t:glitter-crm.admin.contacts.assignee_search",
+                      "noResultsText": "$t:glitter-crm.admin.contacts.no_results",
+                      "initialText": "$t:glitter-crm.admin.contacts.search_initial",
+                      "className": "w-64"
+                    },
+                    "actions": [
+                      {
+                        "event": "onSearch",
+                        "handler": "apiCall",
+                        "debounce": 300,
+                        "auth_required": true,
+                        "target": "/api/admin/users/search",
+                        "params": {"method": "GET", "query": {"keyword": "{{$args[0]}}"}},
+                        "onSuccess": [
+                          {
+                            "handler": "setState",
+                            "params": {
+                              "target": "local",
+                              "assigneeOptions": "{{(response.data ?? []).map(u => ({value:u.uuid,label:u.name,description:u.email}))}}"
+                            }
+                          }
+                        ],
+                        "onError": [{"handler": "setState", "params": {"target": "local", "assigneeOptions": []}}]
+                      },
+                      {
+                        "event": "onChange",
+                        "type": "change",
+                        "handler": "navigate",
+                        "params": {
+                          "path": "/admin/crm/contacts",
+                          "mergeQuery": true,
+                          "query": {"assigned_user_id": "{{$args[0]}}", "page": 1}
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "contact_sort",
+                    "type": "composite",
+                    "name": "Select",
+                    "props": {
+                      "value": "{{(query.sort || 'created_at') + '_' + (query.direction || 'desc')}}",
+                      "className": "w-44",
+                      "options": [
+                        {"label": "$t:glitter-crm.admin.contacts.sort.newest", "value": "created_at_desc"},
+                        {"label": "$t:glitter-crm.admin.contacts.sort.oldest", "value": "created_at_asc"},
+                        {"label": "$t:glitter-crm.admin.contacts.sort.name_asc", "value": "name_asc"},
+                        {"label": "$t:glitter-crm.admin.contacts.sort.name_desc", "value": "name_desc"}
+                      ]
+                    },
+                    "actions": [
+                      {
+                        "type": "change",
+                        "handler": "navigate",
+                        "params": {
+                          "path": "/admin/crm/contacts",
+                          "mergeQuery": true,
+                          "query": {
+                            "sort": "{{$event.target.value.split('_').slice(0,-1).join('_')}}",
+                            "direction": "{{$event.target.value.split('_').pop()}}",
+                            "page": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "contacts_grid",
+            "type": "composite",
+            "name": "DataGrid",
+            "blur_until_loaded": true,
+            "dataKey": "contacts",
+            "props": {
+              "columns": [
+                {"field": "name", "header": "$t:glitter-crm.admin.contacts.fields.name", "sortable": true},
+                {"field": "company", "header": "$t:glitter-crm.admin.contacts.fields.company", "sortable": true},
+                {
+                  "field": "email",
+                  "header": "$t:glitter-crm.admin.contacts.fields.contact",
+                  "cellChildren": [
+                    {"type": "basic", "name": "Span", "text": "{{row.email || row.mobile || row.phone || '$t:glitter-crm.admin.contacts.no_value'}}"}
+                  ]
+                },
+                {
+                  "field": "status",
+                  "header": "$t:glitter-crm.admin.contacts.fields.status",
+                  "sortable": true,
+                  "cellChildren": [
+                    {"type": "composite", "name": "Badge", "props": {"variant": "{{row.status === 'active' ? 'success' : (row.status === 'archived' ? 'secondary' : 'warning')}}", "text": "{{row.status === 'active' ? '$t:glitter-crm.admin.contacts.status.active' : (row.status === 'archived' ? '$t:glitter-crm.admin.contacts.status.archived' : '$t:glitter-crm.admin.contacts.status.inactive')}}"}}
+                  ]
+                },
+                {
+                  "field": "assigned_user",
+                  "header": "$t:glitter-crm.admin.contacts.fields.assignee",
+                  "cellChildren": [{"type": "basic", "name": "Span", "text": "{{row.assigned_user?.name || '$t:glitter-crm.admin.contacts.no_value'}}"}]
+                },
+                {
+                  "field": "next_task_at",
+                  "header": "$t:glitter-crm.admin.contacts.fields.next_action_at",
+                  "sortable": false,
+                  "cellChildren": [
+                    {"type": "basic", "name": "Span", "if": "{{!!row.next_task_at}}", "text": "{{row.next_task_at | datetime('YYYY-MM-DD HH:mm')}}"},
+                    {"type": "basic", "name": "Span", "if": "{{!row.next_task_at}}", "text": "$t:glitter-crm.admin.contacts.no_value"}
+                  ]
+                },
+                {"field": "created_at", "header": "$t:glitter-crm.admin.contacts.fields.created_at", "sortable": true}
+              ],
+              "data": "{{contacts?.data?.data}}",
+              "sortable": true,
+              "sortField": "{{query.sort || 'created_at'}}",
+              "sortDirection": "{{query.direction || 'desc'}}",
+              "pagination": true,
+              "alwaysShowPagination": true,
+              "pageSize": "{{contacts?.data?.meta?.per_page ?? 20}}",
+              "serverSidePagination": true,
+              "serverCurrentPage": "{{contacts?.data?.meta?.current_page ?? 1}}",
+              "serverTotalPages": "{{contacts?.data?.meta?.last_page ?? 1}}",
+              "idField": "uuid",
+              "emptyMessage": "$t:glitter-crm.admin.contacts.empty",
+              "rowActions": [
+                {"id": "edit", "label": "$t:glitter-crm.admin.contacts.edit", "iconName": "pencil", "disabledField": "abilities.can_update"},
+                {"id": "delete", "label": "$t:glitter-crm.admin.contacts.delete", "iconName": "trash", "variant": "danger", "disabledField": "abilities.can_delete"}
+              ],
+              "actionsColumnHeader": "$t:glitter-crm.admin.contacts.fields.actions"
+            },
+            "actions": [
+              {
+                "event": "onSortChange",
+                "type": "change",
+                "handler": "navigate",
+                "params": {
+                  "path": "/admin/crm/contacts",
+                  "mergeQuery": true,
+                  "query": {"sort": "{{$args[0]}}", "direction": "{{$args[1]}}", "page": 1}
+                }
+              },
+              {
+                "event": "onPageChange",
+                "type": "change",
+                "handler": "navigate",
+                "params": {"path": "/admin/crm/contacts", "mergeQuery": true, "query": {"page": "{{$args[0]}}"}}
+              },
+              {
+                "event": "onRowAction",
+                "type": "action",
+                "handler": "switch",
+                "cases": {
+                  "edit": {"handler": "navigate", "params": {"path": "/admin/crm/contacts/{{$args[1].uuid}}/edit"}},
+                  "delete": {
+                    "handler": "sequence",
+                    "actions": [
+                      {"handler": "setState", "params": {"target": "local", "deleteUuid": "{{$args[1].uuid}}", "deleting": false}},
+                      {"handler": "openModal", "target": "delete_contact_modal"}
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "modals": [
+    {
+      "id": "delete_contact_modal",
+      "type": "composite",
+      "name": "Modal",
+      "props": {
+        "title": "$t:glitter-crm.admin.contacts.delete_confirm_title",
+        "description": "$t:glitter-crm.admin.contacts.delete_confirm_description"
+      },
+      "children": [
+        {
+          "type": "basic",
+          "name": "Div",
+          "props": {"className": "flex justify-end gap-2"},
+          "children": [
+            {
+              "type": "basic",
+              "name": "Button",
+              "props": {"className": "btn btn-neutral", "disabled": "{{_local.deleting === true}}"},
+              "actions": [{"type": "click", "handler": "closeModal", "target": "delete_contact_modal"}],
+              "children": [{"type": "basic", "name": "Span", "text": "$t:glitter-crm.admin.contacts.cancel"}]
+            },
+            {
+              "type": "basic",
+              "name": "Button",
+              "props": {"className": "btn btn-danger", "disabled": "{{_local.deleting === true}}"},
+              "actions": [
+                {
+                  "type": "click",
+                  "handler": "sequence",
+                  "actions": [
+                    {"handler": "setState", "params": {"target": "local", "deleting": true}},
+                    {
+                      "handler": "apiCall",
+                      "target": "/api/modules/glitter-crm/admin/contacts/{{_local.deleteUuid}}",
+                      "params": {"method": "DELETE"},
+                      "onSuccess": [
+                        {"handler": "toast", "params": {"type": "success", "message": "$t:glitter-crm.admin.contacts.deleted"}},
+                        {"handler": "refetchDataSource", "params": {"dataSourceId": "contacts"}},
+                        {"handler": "closeModal", "target": "delete_contact_modal"}
+                      ],
+                      "onError": [
+                        {"handler": "setState", "params": {"target": "local", "deleting": false}},
+                        {"handler": "toast", "params": {"type": "error", "message": "$t:glitter-crm.admin.contacts.delete_failed"}}
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "children": [{"type": "basic", "name": "Span", "text": "{{_local.deleting ? '$t:glitter-crm.admin.contacts.deleting' : '$t:glitter-crm.admin.contacts.delete'}}"}]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

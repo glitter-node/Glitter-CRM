@@ -1,0 +1,59 @@
+{
+    "version": "1.3.3",
+    "routes": [
+        {
+            "path": "*/admin/crm/contacts",
+            "layout": "admin_crm_contact_index",
+            "auth_required": true,
+            "meta": {
+                "title": "$t:glitter-crm.admin.contacts.title",
+                "permission": "glitter-crm.contacts.read"
+            }
+        },
+        {
+            "path": "*/admin/crm/contacts/create",
+            "layout": "admin_crm_contact_form",
+            "auth_required": true,
+            "meta": {
+                "title": "$t:glitter-crm.admin.contacts.create_title",
+                "permission": "glitter-crm.contacts.create"
+            }
+        },
+        {
+            "path": "*/admin/crm/contacts/:id/edit",
+            "layout": "admin_crm_contact_form",
+            "auth_required": true,
+            "meta": {
+                "title": "$t:glitter-crm.admin.contacts.edit_title",
+                "permission": "glitter-crm.contacts.read"
+            }
+        },
+        {
+            "path": "*/admin/crm/tags",
+            "layout": "admin_crm_tag_index",
+            "auth_required": true,
+            "meta": {
+                "title": "$t:glitter-crm.admin.tags.title",
+                "permission": "glitter-crm.tags.read"
+            }
+        },
+        {
+            "path": "*/admin/crm/tags/create",
+            "layout": "admin_crm_tag_form",
+            "auth_required": true,
+            "meta": {
+                "title": "$t:glitter-crm.admin.tags.create_title",
+                "permission": "glitter-crm.tags.create"
+            }
+        },
+        {
+            "path": "*/admin/crm/tags/:id/edit",
+            "layout": "admin_crm_tag_form",
+            "auth_required": true,
+            "meta": {
+                "title": "$t:glitter-crm.admin.tags.edit_title",
+                "permission": "glitter-crm.tags.read"
+            }
+        }
+    ]
+}

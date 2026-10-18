@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Glitter CRM icon">
+  <rect width="512" height="512" rx="112" fill="#172536"/>
+  <rect x="88" y="100" width="336" height="312" rx="32" fill="#F7FAFC"/>
+  <rect x="116" y="130" width="280" height="252" rx="22" fill="#E8F0F4"/>
+  <circle cx="194" cy="214" r="36" fill="#238F90"/>
+  <path d="M132 303c0-35 28-63 62-63s62 28 62 63v9H132z" fill="#238F90"/>
+  <rect x="282" y="184" width="87" height="14" rx="7" fill="#29465D"/>
+  <rect x="282" y="214" width="65" height="12" rx="6" fill="#90A8B7"/>
+  <path d="M283 268h72" stroke="#90A8B7" stroke-width="12" stroke-linecap="round"/>
+  <path d="M283 298h53" stroke="#90A8B7" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="364" cy="356" r="69" fill="#18A99A" stroke="#172536" stroke-width="12"/>
+  <path d="M332 359l21 21 43-46" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
